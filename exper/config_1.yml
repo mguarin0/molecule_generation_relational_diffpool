@@ -1,0 +1,14 @@
+exper:
+  3_layer:
+    layer_downsample_percents: [0.75, 0.50, 0.25] 
+    gcn_layer_hidden_dims: [16, 16, 16]
+    ff_layer_hidden_dims: [64, 16] 
+  4_layer:
+    layer_downsample_percents: [0.75, 0.50, 0.50, 0.25] 
+    gcn_layer_hidden_dims: [16, 16, 16, 16] 
+    ff_layer_hidden_dims: [64, 16] 
+#                input_features_dim: int,
+#                hidden_dim: int,
+#                nodes_dim: int,
+#                num_classes: int,
+#                layer_downsample_percents: list
