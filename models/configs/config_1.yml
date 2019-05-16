@@ -1,0 +1,23 @@
+seeds:
+  torch_seeds: [950148, 171376, 620516,
+                952498, 528800, 382510,
+                685351, 910227, 881256,
+                160444]
+  numpy_seeds: [700112, 118184, 721042,
+                849212, 447234, 640394,
+                471836, 792048, 194291,
+                503440]
+exper:
+  3_layer:
+    layer_downsample_percents: [0.75, 0.50, 0.25] 
+    gcn_layer_hidden_dims: [16, 16, 16]
+    ff_layer_hidden_dims: [64, 16] 
+  4_layer:
+    layer_downsample_percents: [0.75, 0.50, 0.50, 0.25] 
+    gcn_layer_hidden_dims: [16, 16, 16, 16] 
+    ff_layer_hidden_dims: [64, 16] 
+#                input_features_dim: int,
+#                hidden_dim: int,
+#                nodes_dim: int,
+#                num_classes: int,
+#                layer_downsample_percents: list
