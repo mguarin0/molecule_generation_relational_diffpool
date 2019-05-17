@@ -31,8 +31,8 @@ class Exper_Config:
     self._set_paths()
     self._load_dataset()
     self.summary_writer = self._get_SummaryWriter()
-    self.model_config = self._get_exper_config(model_config_file)
-    self.seeds = self.model_config["seeds"]
+    self.model_configs = self._get_exper_config(model_config_file)
+    self.seeds = self.model_configs["seeds"]
     self.total_replica_num = len(self.seeds)
     self._set_seeds()
 
@@ -82,6 +82,9 @@ class Exper_Config:
     self.replica_num+=1
     self._set_seeds()
 
+  def set_model_config(self, model_k):
+    self.model_config = self.model_configs["expers"][model_k]
+  
   def set_curr_exper_name(self, curr_exper_name):
     self.curr_exper_name = "{}_{}".format(self.model_config_filename,
                                           curr_exper_name)

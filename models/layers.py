@@ -9,10 +9,10 @@ from torch_geometric.nn import DenseSAGEConv, dense_diff_pool
 
 
 # @author of this class is yongqyu
-class RGCN(nn.Module):
+class RGCN_Block(nn.Module):
 
   def __init__(self, layer_dims, dropout):
-    super(RGCN, self).__init__()
+    super(RGCN_Block, self).__init__()
 
     # set up rgcn layers
     self.layers = nn.ModuleList([nn.Linear(ln, lnn)
@@ -38,7 +38,7 @@ class RGCN(nn.Module):
 
 class DiffPool_Block(nn.Module):
   def __init__(self, layer_dims):
-    super(Block, self).__init__()
+    super(DiffPool_Block, self).__init__()
 
     # set up gcn layers
     self.layers = nn.ModuleList([DenseSAGEConv(ln, lnn)
@@ -76,8 +76,8 @@ class DiffPool(nn.Module):
     self.node_dim = x_dim
     self.embed = nn.ModuleList()
     self.pool = nn.ModuleList()
-    self.embed.append(RGCN(embed_rgcn_layer_params[0], embed_rgcn_layer_params[1]))
-    self.pool.append(RGCN([self.get_lnn_layer_dim(pool_percnt)
+    self.embed.append(RGCN_Block(embed_rgcn_layer_params[0], embed_rgcn_layer_params[1]))
+    self.pool.append(RGCN_Block([self.get_lnn_layer_dim(pool_percnt)
                         for pool_percnt in pool_rgcn_layer_params[0]],
                      pool_rgcn_layer_params[1]))
     """
@@ -101,7 +101,7 @@ class DiffPool(nn.Module):
     self.lin3_aux = Linear(ff_hidden_dims[1], num_classes)
     """
 
-  def get_lnn_layer_dim(pool_percent):
+  def get_lnn_layer_dim(self, pool_percent):
     self.node_dim = ceil(self.node_dim * pool_percent)
     return self.node_dim
 

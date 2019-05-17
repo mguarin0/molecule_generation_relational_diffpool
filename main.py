@@ -64,14 +64,16 @@ if __name__ == "__main__":
   exper_config = Exper_Config(**vars(args))
 
   # run all experiments
-  for model_k in exper_config.model_config["expers"]:
+  for model_k in exper_config.model_configs["expers"]:
     exper_config.set_curr_exper_name(model_k)
+    exper_config.set_model_config(model_k)
 
     # run all replicas for a given experiment
     for curr_replica_num in enumerate(range(exper_config.total_replica_num)):
 
       # set up model operations for new replica
       model_ops = Model_Ops(exper_config)
+      model_ops.train()
       #disc_loss = nn.BCELoss().to(experiment_config["device"]) # discriminator loss
       #aux_loss = nn.MSELoss().to(experiment_config["device"]) # aux loss
 

@@ -336,8 +336,4 @@ def all_scores(mols, data, norm=False, reconstruction=False):
     return m0, m1
 
 
-def label2onehot(labels, dim, device):
-    """Convert label indices to one-hot vectors."""
-    out = torch.zeros(list(labels.size())+[dim]).to(device)
-    out.scatter_(len(out.size())-1, labels.unsqueeze(-1), 1.)
-    return out
+
