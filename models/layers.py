@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear
-#from torch_geometric.nn import GATConv, dense_diff_pool, RGCNConv
 from torch_geometric.nn import DenseSAGEConv, dense_diff_pool
 
 
@@ -82,14 +81,17 @@ class DiffPool(nn.Module):
                ff_layer_params):
     super(DiffPool, self).__init__()
 
-    self.embed_blocks = nn.ModuleList()
-    self.pool_blocks = nn.ModuleList()
-    self.embed_blocks.append(RGCN_Block(x_dim,
-                                        embed_rgcn_layer_params[0],
-                                        embed_rgcn_layer_params[1]))
-    self.pool_blocks.append(RGCN_Block(x_dim,
-                                       self.get_lnn_layer_dim(n_dim, pool_rgcn_layer_params[0]),
-                                       pool_rgcn_layer_params[1]))
+    self.embed_blocks = nn.ModuleDict({
+      "rgcn": RGCN_Block(x_dim,
+                         embed_rgcn_layer_params[0],
+                         embed_rgcn_layer_params[1])
+      })
+
+    self.pool_blocks = nn.ModuleDict({
+      "rgcn": RGCN_Block(x_dim,
+                         self.get_lnn_layer_dim(n_dim, pool_rgcn_layer_params[0]),
+                         pool_rgcn_layer_params[1])
+      })
     """
     num_nodes = ceil(layer_downsample_percents[0] * nodes_dim) # pool down
     self.embed_block1 = DiffPool_Block(input_x_dim, gcn_hidden_dims[0], gcn_hidden_dims[0])
@@ -133,7 +135,7 @@ class DiffPool(nn.Module):
     self.lin3_aux.reset_parameters()
   """
 
-  def forward(self, x, adj, mask=None):
+  def forward(self, x, adj, rel_adj, mask=None):
     """
     x: [b, n, f]
     adj: [b, n, n]
@@ -142,10 +144,13 @@ class DiffPool(nn.Module):
     print("x: {}".format(x.shape))
     print("adj: {}".format(adj.shape))
 
-    for embed, pool in zip(self.embed_blocks, self.pool_blocks):
-      s = pool(x, adj)
-      x = embed(x, adj)
-      print("first pass")
+    for k_embed, k_pool in zip(self.embed_blocks, self.pool_blocks):
+      if k_embed=="rgcn" and k_pool=="rgcn":
+        s = self.pool_blocks[k_pool](x, rel_adj)
+        x = self.embed_blocks[k_embed](x, rel_adj)
       print("x: {}".format(x.shape))
       print("s: {}".format(s.shape))
+      x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
+      print("x: {}".format(x.shape))
+      print("adj: {}".format(adj.shape))
       exit(0)

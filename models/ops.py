@@ -23,7 +23,7 @@ class Model_Ops:
     real_logPs = MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=True)
     real_logPs = torch.from_numpy(real_logPs).to(self.exper_config.device).float() # [b]
 
-    return a_tensor, x_tensor, z, real_logPs 
+    return a, a_tensor, x_tensor, z, real_logPs 
 
   #def log_performance(self):
     """ log performance here """
@@ -38,9 +38,10 @@ class Model_Ops:
     for step in range(total_training_steps):
       mols, _, _, a, x, _, _, _, _, z, _ = self.exper_config.data.next_train_batch(self.exper_config.batch_size,
                                                                                    self.exper_config.z_dim)
-      a_tensor, x_tensor, z, real_logPs = self.process_batch(mols, a, x, z)
-      self.model(x_tensor, a_tensor[:,:,:,1:].permute(0,3,1,2))
+      adj, rel_adj, x, z, real_logPs = self.process_batch(mols, a, x, z)
+      self.model(x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2))
 #     print(x_tensor.size())# [32, 9, 5]
+#     print(a.size()) # [32, 9, 9]
 #     print(a_tensor.size())# [32, 9, 9, 5]
 #     print(self.exper_config.data.bond_num_types) # 5 -1
 #     print(self.exper_config.data.bond_num_types) # 5

@@ -27,7 +27,7 @@ class DiPol_GraphVAE(nn.Module):
                           model_config["decoder"]["ff_layer_params"])
       })
 
-  def forward(self, x, adj, module_type="encoder"):
+  def forward(self, x, adj, rel_adj, module_type="encoder"):
     for name, param in self.dipol_modules[module_type].named_parameters():
       print(name, param.size())
-    self.dipol_modules[module_type](x, adj)
+    self.dipol_modules[module_type](x, adj, rel_adj)
