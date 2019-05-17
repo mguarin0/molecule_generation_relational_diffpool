@@ -49,4 +49,6 @@ class Model_Ops:
     if self.exper_config.model_config["type"] == "DiPol_GraphVAE":
       from models import DiPol_GraphVAE
       self.model = DiPol_GraphVAE(self.exper_config.data.atom_num_types,
+                                  self.exper_config.data.bond_num_types,
+                                  self.exper_config.data.z_dim,
                                   self.exper_config.model_config)

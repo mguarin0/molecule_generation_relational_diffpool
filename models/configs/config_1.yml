@@ -7,16 +7,19 @@ seeds:
                 849212, 447234, 640394,
                 471836, 792048, 194291,
                 503440]
-exper:
+expers:
   # first experiment is 3 layers
-  type: "DiPol_GraphVAE":
-  encoder:
-    embed_rgcn_layer_hidden_dims: [128, 64]
-    embed_layer_hidden_dims: [16, 16, 16]
-    pool_layer_downsample_percents: [0.75, 0.50, 0.25] 
-    ff_layer_hidden_dims: [64, 16] 
-  decoder:
-    embed_rgcn_layer_hidden_dims: [128, 64]
-    embed_layer_hidden_dims: [16, 16, 16]
-    pool_layer_downsample_percents: [0.75, 0.50, 0.25] 
-    ff_layer_hidden_dims: [64, 16] 
+  4_layer_dipol_gvae:
+    type: "DiPol_GraphVAE"
+    encoder:
+      embed_rgcn_layer_params: [[128, 64], 0.0]
+      pool_rgcn_layer_params: [[0.90, 0.75], 0.0]
+      embed_block_layer_params: [[16, 16], 0.0]
+      pool_block_layer_params: [[0.50, 0.25], 0.0]
+      ff_layer_params: [[64, 16], 0.0] 
+    decoder:
+      embed_rgcn_layer_params: [[128, 64], 0.0]
+      pool_rgcn_layer_params: [[0.90, 0.75], 0.0]
+      embed_block_layer_params: [[16, 16], 0.0]
+      pool_block_layer_params: [[0.50, 0.25], 0.0]
+      ff_layer_params: [[64, 16], 0.0] 

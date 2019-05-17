@@ -27,7 +27,7 @@ class Exper_Config:
     self.use_cuda = use_cuda
     self.replica_num = 0
     self._set_device()
-    self.exper_name = model_config_file.split(".")[0]
+    self.model_config_filename = model_config_file.split(".")[0]
     self._set_paths()
     self._load_dataset()
     self.summary_writer = self._get_SummaryWriter()
@@ -53,7 +53,7 @@ class Exper_Config:
     ROOT_DIR = abspath(curdir)
     DATA_DIR = join(ROOT_DIR, "data")
     RESULTS_DIR = join(ROOT_DIR, "results")
-    EXPER_RESULTS_DIR = join(RESULTS_DIR, self.exper_name)
+    EXPER_RESULTS_DIR = join(RESULTS_DIR, self.model_config_filename)
     MODELS_DIR = join(ROOT_DIR, "models")
     MODELS_CONFIG_DIR = join(MODELS_DIR, "configs")
     self.paths = {
@@ -83,7 +83,8 @@ class Exper_Config:
     self._set_seeds()
 
   def set_curr_exper_name(self, curr_exper_name):
-    self.curr_exper_name = "{}_{}".format(self.exper_name, curr_exper_name)
+    self.curr_exper_name = "{}_{}".format(self.model_config_filename,
+                                          curr_exper_name)
 
   def _get_exper_config(self, model_config_file):
     # assert yml extension

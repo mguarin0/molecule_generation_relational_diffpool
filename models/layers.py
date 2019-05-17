@@ -14,6 +14,7 @@ class RGCN(nn.Module):
   def __init__(self, layer_dims, dropout):
     super(RGCN, self).__init__()
 
+    # set up rgcn layers
     self.layers = nn.ModuleList([nn.Linear(ln, lnn)
                                    for ln, lnn in zip(layer_dims[:-1],
                                                       layer_dims[1:])])
@@ -32,16 +33,18 @@ class RGCN(nn.Module):
       out = torch.sum(torch.einsum('brnv,brve->brne', (adj, out)), 1) + layer(x)
       out = activation(out) if activation is not None else out
       out = self.dropout(out)
-    return out
+    return out # bxnxe
 
 
 class DiffPool_Block(nn.Module):
   def __init__(self, layer_dims):
     super(Block, self).__init__()
 
+    # set up gcn layers
     self.layers = nn.ModuleList([DenseSAGEConv(ln, lnn)
                                    for ln, lnn in zip(layer_dims[:-1],
                                                       layer_dims[1:])])
+    # set up ff layers
     self.layers.append(torch.nn.Linear(layer_dims[-2] + layer_dims[-1],
                                        layer_dims[-1]))
 
@@ -60,19 +63,27 @@ class DiffPool_Block(nn.Module):
 
 class DiffPool(nn.Module):
   def __init__(self,
-               input_x_dim: int,
-               nodes_dim: int,
-               embed_rgcn_layer_hidden_dims: list,
-               embed_layer_hidden_dims: list,
-               pool_layer_downsample_percents: list
-               ff_layer_hidden_dims: list):
+               x_dim,
+               r_dim,
+               z_dim,
+               embed_rgcn_layer_params,
+               pool_rgcn_layer_params,
+               embed_block_layer_params,
+               pool_block_layer_params,
+               ff_layer_params):
     super(DiffPool, self).__init__()
-    rgcn_embed = RGCN
-    rgcn_pool = RGCN
 
+    self.node_dim = x_dim
+    self.embed = nn.ModuleList()
+    self.pool = nn.ModuleList()
+    self.embed.append(RGCN(embed_rgcn_layer_params[0], embed_rgcn_layer_params[1]))
+    self.pool.append(RGCN([self.get_lnn_layer_dim(pool_percnt)
+                        for pool_percnt in pool_rgcn_layer_params[0]],
+                     pool_rgcn_layer_params[1]))
+    """
     num_nodes = ceil(layer_downsample_percents[0] * nodes_dim) # pool down
-    self.embed_block1 = Block(input_x_dim, gcn_hidden_dims[0], gcn_hidden_dims[0])
-    self.pool_block1 = Block(input_x_dim, gcn_hidden_dims[0], num_nodes)
+    self.embed_block1 = DiffPool_Block(input_x_dim, gcn_hidden_dims[0], gcn_hidden_dims[0])
+    self.pool_block1 = DiffPool_Block(input_x_dim, gcn_hidden_dims[0], num_nodes)
 
     self.embed_blocks = torch.nn.ModuleList()
     self.pool_blocks = torch.nn.ModuleList()
@@ -88,8 +99,14 @@ class DiffPool(nn.Module):
     self.lin1_aux = Linear(gcn_hidden_dims[-1], ff_hidden_dims[0])
     self.lin2_aux = Linear(ff_hidden_dims[0], ff_hidden_dims[1])
     self.lin3_aux = Linear(ff_hidden_dims[1], num_classes)
+    """
+
+  def get_lnn_layer_dim(pool_percent):
+    self.node_dim = ceil(self.node_dim * pool_percent)
+    return self.node_dim
 
 
+  """
   def reset_parameters(self):
     self.embed_block1.reset_parameters()
     self.pool_block1.reset_parameters()
@@ -102,12 +119,15 @@ class DiffPool(nn.Module):
     self.lin1_aux.reset_parameters()
     self.lin2_aux.reset_parameters()
     self.lin3_aux.reset_parameters()
+  """
 
   def forward(self, x, adj, mask):
+    print("forward")
     """
     x: [b, n, f]
     adj: [b, n, n]
     mask: [b, n]
+    """
     """
     s = self.pool_block1(x, adj, mask, add_loop=True) # [b, n, downsampled_dim]
     x = F.relu(self.embed_block1(x, adj, mask, add_loop=True)) # [b, n, downsampled_dim]
@@ -136,3 +156,4 @@ class DiffPool(nn.Module):
       x_aux = self.lin3_aux(x_aux)
 
       return x_disc, x_aux
+    """
