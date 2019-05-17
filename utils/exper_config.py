@@ -25,6 +25,7 @@ class Exper_Config:
     self.validate_every = validate_every
     self.dataset = dataset
     self.use_cuda = use_cuda
+    self.num_vertices = 9
     self.replica_num = 0
     self._set_device()
     self.model_config_filename = model_config_file.split(".")[0]

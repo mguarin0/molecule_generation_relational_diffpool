@@ -11,10 +11,11 @@ from torch_geometric.nn import DenseSAGEConv, dense_diff_pool
 # @author of this class is yongqyu
 class RGCN_Block(nn.Module):
 
-  def __init__(self, layer_dims, dropout):
+  def __init__(self, x_dim, layer_dims, dropout):
     super(RGCN_Block, self).__init__()
 
     # set up rgcn layers
+    layer_dims = [x_dim] + layer_dims
     self.layers = nn.ModuleList([nn.Linear(ln, lnn)
                                    for ln, lnn in zip(layer_dims[:-1],
                                                       layer_dims[1:])])
@@ -29,10 +30,17 @@ class RGCN_Block(nn.Module):
     # adj : bxrxnxn
 
     for layer in self.layers:
+      print(layer)
+      hi = layer(x)
       out = torch.stack([layer(x) for _ in range(adj.size(1))], 1)
-      out = torch.sum(torch.einsum('brnv,brve->brne', (adj, out)), 1) + layer(x)
+      print(out.size())
+      out = hi+torch.sum(torch.einsum('brnv,brve->brne', (adj, out)), 1)
+      print(out.size())
       out = activation(out) if activation is not None else out
+      print(out.size())
       out = self.dropout(out)
+      print(out.size())
+      x=out
     return out # bxnxe
 
 
@@ -65,6 +73,7 @@ class DiffPool(nn.Module):
   def __init__(self,
                x_dim,
                r_dim,
+               n_dim,
                z_dim,
                embed_rgcn_layer_params,
                pool_rgcn_layer_params,
@@ -73,13 +82,14 @@ class DiffPool(nn.Module):
                ff_layer_params):
     super(DiffPool, self).__init__()
 
-    self.node_dim = x_dim
-    self.embed = nn.ModuleList()
-    self.pool = nn.ModuleList()
-    self.embed.append(RGCN_Block(embed_rgcn_layer_params[0], embed_rgcn_layer_params[1]))
-    self.pool.append(RGCN_Block([self.get_lnn_layer_dim(pool_percnt)
-                        for pool_percnt in pool_rgcn_layer_params[0]],
-                     pool_rgcn_layer_params[1]))
+    self.embed_blocks = nn.ModuleList()
+    self.pool_blocks = nn.ModuleList()
+    self.embed_blocks.append(RGCN_Block(x_dim,
+                                        embed_rgcn_layer_params[0],
+                                        embed_rgcn_layer_params[1]))
+    self.pool_blocks.append(RGCN_Block(x_dim,
+                                       self.get_lnn_layer_dim(n_dim, pool_rgcn_layer_params[0]),
+                                       pool_rgcn_layer_params[1]))
     """
     num_nodes = ceil(layer_downsample_percents[0] * nodes_dim) # pool down
     self.embed_block1 = DiffPool_Block(input_x_dim, gcn_hidden_dims[0], gcn_hidden_dims[0])
@@ -101,10 +111,12 @@ class DiffPool(nn.Module):
     self.lin3_aux = Linear(ff_hidden_dims[1], num_classes)
     """
 
-  def get_lnn_layer_dim(self, pool_percent):
-    self.node_dim = ceil(self.node_dim * pool_percent)
-    return self.node_dim
-
+  def get_lnn_layer_dim(self, n, pool_percents):
+    pool_dims = []
+    for pool_percent in pool_percents:
+      n = ceil(n * pool_percent)
+      pool_dims.append(n)
+    return pool_dims 
 
   """
   def reset_parameters(self):
@@ -121,39 +133,19 @@ class DiffPool(nn.Module):
     self.lin3_aux.reset_parameters()
   """
 
-  def forward(self, x, adj, mask):
-    print("forward")
+  def forward(self, x, adj, mask=None):
     """
     x: [b, n, f]
     adj: [b, n, n]
     mask: [b, n]
     """
-    """
-    s = self.pool_block1(x, adj, mask, add_loop=True) # [b, n, downsampled_dim]
-    x = F.relu(self.embed_block1(x, adj, mask, add_loop=True)) # [b, n, downsampled_dim]
-    xs = [x.mean(dim=1)]
-    x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s, mask)
+    print("x: {}".format(x.shape))
+    print("adj: {}".format(adj.shape))
 
     for embed, pool in zip(self.embed_blocks, self.pool_blocks):
       s = pool(x, adj)
-      x = F.relu(embed(x, adj))
-      xs.append(x.mean(dim=1))
-      x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
-
-      # disc
-      x_disc = F.relu(self.lin1_disc(x))
-      x_disc = F.dropout(x_disc, p=0.5, training=self.training)
-      x_disc = F.relu(self.lin2_disc(x_disc))
-      x_disc = F.dropout(x_disc, p=0.5, training=self.training)
-      x_disc = self.lin3_disc(x_disc)
-      x_disc = F.sigmoid(x_disc)
-
-      # aux
-      x_aux = F.relu(self.lin1_aux(x))
-      x_aux = F.dropout(x_aux, p=0.5, training=self.training)
-      x_aux = F.relu(self.lin2_aux(x_aux))
-      x_aux = F.dropout(x_aux, p=0.5, training=self.training)
-      x_aux = self.lin3_aux(x_aux)
-
-      return x_disc, x_aux
-    """
+      x = embed(x, adj)
+      print("first pass")
+      print("x: {}".format(x.shape))
+      print("s: {}".format(s.shape))
+      exit(0)
