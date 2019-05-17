@@ -8,16 +8,15 @@ seeds:
                 471836, 792048, 194291,
                 503440]
 exper:
-  3_layer:
-    layer_downsample_percents: [0.75, 0.50, 0.25] 
-    gcn_layer_hidden_dims: [16, 16, 16]
+  # first experiment is 3 layers
+  type: "DiPol_GraphVAE":
+  encoder:
+    embed_rgcn_layer_hidden_dims: [128, 64]
+    embed_layer_hidden_dims: [16, 16, 16]
+    pool_layer_downsample_percents: [0.75, 0.50, 0.25] 
     ff_layer_hidden_dims: [64, 16] 
-  4_layer:
-    layer_downsample_percents: [0.75, 0.50, 0.50, 0.25] 
-    gcn_layer_hidden_dims: [16, 16, 16, 16] 
+  decoder:
+    embed_rgcn_layer_hidden_dims: [128, 64]
+    embed_layer_hidden_dims: [16, 16, 16]
+    pool_layer_downsample_percents: [0.75, 0.50, 0.25] 
     ff_layer_hidden_dims: [64, 16] 
-#                input_features_dim: int,
-#                hidden_dim: int,
-#                nodes_dim: int,
-#                num_classes: int,
-#                layer_downsample_percents: list

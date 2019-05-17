@@ -71,7 +71,6 @@ if __name__ == "__main__":
     # run all replicas for a given experiment
     for curr_replica_num in enumerate(range(exper_config.total_replica_num)):
 
-      # TODO set up model for new replica
       # set up model operations for new replica
       model_ops = Model_Ops(args.num_epochs)
       #disc_loss = nn.BCELoss().to(experiment_config["device"]) # discriminator loss
@@ -86,3 +85,4 @@ if __name__ == "__main__":
           # TODO log/print training results for current step
         # TODO add logging here
         # TODO log/print validation results for validation step
+      # TODO set up model for new replica
