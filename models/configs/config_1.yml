@@ -22,4 +22,4 @@ expers:
       pool_rgcn_layer_params: [[0.90, 0.75], 0.0]
       embed_gcn_layer_params: [[16, 32], 0.0]
       pool_gcn_layer_params: [[0.50, 0.25], 0.0]
-      ff_layer_params: [[64, 16], 0.0] 
+      ff_layer_params: [[32, 64], 0.0] 
