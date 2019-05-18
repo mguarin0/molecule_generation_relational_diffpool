@@ -84,36 +84,37 @@ class DiffPool(nn.Module):
     self.module_type = module_type
     self.embed_gcn_layer_params = embed_gcn_layer_params
     # TODO make this more dynamic low priority
-    self.embed_blocks = nn.ModuleDict([
-      ["rgcn", RGCN_Block(x_dim,
-                         embed_rgcn_layer_params[0],
-                         embed_rgcn_layer_params[1])],
-      ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
-                            embed_gcn_layer_params[0][0],
-                            embed_gcn_layer_params[0][0],
-                            embed_gcn_layer_params[1])],
-      ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
-                            embed_gcn_layer_params[0][0],
-                            embed_gcn_layer_params[0][1],
-                            embed_gcn_layer_params[1])]
-      ])
-    self.rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
-    self.gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
-    self.pool_blocks = nn.ModuleDict([
-      ["rgcn", RGCN_Block(x_dim,
-                         self.rgcn_pooled_layer_dims,
-                         pool_rgcn_layer_params[1])],
-      ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
-                            embed_gcn_layer_params[0][0],
-                            self.gcn_pooled_layer_dims[0],
-                            pool_gcn_layer_params[1])],
-      ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
-                            embed_gcn_layer_params[0][0],
-                            self.gcn_pooled_layer_dims[1],
-                            pool_gcn_layer_params[1])]
-      ])
 
     if module_type == "encoder":
+      self.embed_blocks = nn.ModuleDict([
+        ["rgcn", RGCN_Block(x_dim,
+                           embed_rgcn_layer_params[0],
+                           embed_rgcn_layer_params[1])],
+        ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[1])],
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][1],
+                              embed_gcn_layer_params[1])]
+        ])
+      self.rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
+      self.gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
+      self.pool_blocks = nn.ModuleDict([
+        ["rgcn", RGCN_Block(x_dim,
+                           self.rgcn_pooled_layer_dims,
+                           pool_rgcn_layer_params[1])],
+        ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
+                              embed_gcn_layer_params[0][0],
+                              self.gcn_pooled_layer_dims[0],
+                              pool_gcn_layer_params[1])],
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              self.gcn_pooled_layer_dims[1],
+                              pool_gcn_layer_params[1])]
+        ])
+
       # TODO regularize
       self.encoder_z_layer = nn.Sequential(Linear(self.gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
                                        ff_layer_params[0][0]),
@@ -121,6 +122,35 @@ class DiffPool(nn.Module):
                                 Linear(ff_layer_params[0][0],
                                        z_dim))
     elif module_type == "decoder":
+      self.embed_blocks = nn.ModuleDict([
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[1])],
+        ["gsage_1", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][1],
+                              embed_gcn_layer_params[1])]
+#       ["rgcn", RGCN_Block(x_dim,
+#                          embed_rgcn_layer_params[0],
+#                          embed_rgcn_layer_params[1])],
+        ])
+      self.rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
+      self.gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
+      self.pool_blocks = nn.ModuleDict([
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              self.gcn_pooled_layer_dims[0],
+                              pool_gcn_layer_params[1])],
+        ["gsage_1", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              self.gcn_pooled_layer_dims[1],
+                              pool_gcn_layer_params[1])]
+#       ["rgcn", RGCN_Block(x_dim,
+#                          self.rgcn_pooled_layer_dims,
+#                          pool_rgcn_layer_params[1])],
+        ])
+
       self.decode_z_layers = []
       for ln, lnn in zip([z_dim]+ff_layer_params[0][:-1], ff_layer_params[0]):
         self.decode_z_layers.append(nn.Linear(ln, lnn))

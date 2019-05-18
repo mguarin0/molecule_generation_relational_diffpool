@@ -40,7 +40,9 @@ class Model_Ops:
                                                                                    self.exper_config.z_dim)
       adj, rel_adj, x, z, real_logPs = self.process_batch(mols, a, x, z)
       z = self.model((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)), "encoder")
+      print("================")
       print(z.shape)
+      print("================")
       self.model((z), "decoder")
       exit(0)
 #     print(x_tensor.size())# [32, 9, 5]
