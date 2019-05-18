@@ -82,6 +82,7 @@ class DiffPool(nn.Module):
     super(DiffPool, self).__init__()
 
     self.module_type = module_type
+    self.embed_gcn_layer_params = embed_gcn_layer_params
     # TODO make this more dynamic low priority
     self.embed_blocks = nn.ModuleDict([
       ["rgcn", RGCN_Block(x_dim,
@@ -96,35 +97,51 @@ class DiffPool(nn.Module):
                             embed_gcn_layer_params[0][1],
                             embed_gcn_layer_params[1])]
       ])
-    rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
-    gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
+    self.rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
+    self.gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
     self.pool_blocks = nn.ModuleDict([
       ["rgcn", RGCN_Block(x_dim,
-                         rgcn_pooled_layer_dims,
+                         self.rgcn_pooled_layer_dims,
                          pool_rgcn_layer_params[1])],
       ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
                             embed_gcn_layer_params[0][0],
-                            gcn_pooled_layer_dims[0],
+                            self.gcn_pooled_layer_dims[0],
                             pool_gcn_layer_params[1])],
       ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
                             embed_gcn_layer_params[0][0],
-                            gcn_pooled_layer_dims[1],
+                            self.gcn_pooled_layer_dims[1],
                             pool_gcn_layer_params[1])]
       ])
+
     if module_type == "encoder":
-      self.mk_z = nn.Sequential(Linear(gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
+      # TODO regularize
+      self.encoder_z_layer = nn.Sequential(Linear(self.gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
                                        ff_layer_params[0][0]),
                                 nn.Tanh(),
                                 Linear(ff_layer_params[0][0],
                                        z_dim))
-    #elif module_type == "decoder":
-     
+    elif module_type == "decoder":
+      self.decode_z_layers = []
+      for ln, lnn in zip([z_dim]+ff_layer_params[0][:-1], ff_layer_params[0]):
+        self.decode_z_layers.append(nn.Linear(ln, lnn))
+        self.decode_z_layers.append(nn.Tanh())
+        self.decode_z_layers.append(nn.Dropout(p=ff_layer_params[1],
+                                                    inplace=True))
+      self.decode_z_layer = nn.Sequential(*self.decode_z_layers)
+      self.x_layer = Linear(ff_layer_params[0][-1],
+                             self.gcn_pooled_layer_dims[0] * embed_gcn_layer_params[0][0])
+      self.adj_layer = Linear(ff_layer_params[0][-1],
+                               self.gcn_pooled_layer_dims[0]**2)
+      self.decoder_dropout = nn.Dropout(p=ff_layer_params[1])
+
 
   def get_pooled_layer_dims(self, n, pool_percents):
     pool_dims = []
     for pool_percent in pool_percents:
       n = ceil(n * pool_percent)
       pool_dims.append(n)
+    if self.module_type == "decoder":
+      pool_dims = list(reversed(pool_dims))
     return pool_dims 
 
   def forward(self, input):
@@ -137,6 +154,17 @@ class DiffPool(nn.Module):
        x, adj, rel_adj = input
     elif self.module_type == "decoder":
        z = input
+       out = self.decode_z_layer(z)
+       x_logits = self.x_layer(out)\
+                    .view(-1,
+                          self.gcn_pooled_layer_dims[0],
+                          self.embed_gcn_layer_params[0][0])
+       adj_logits = self.adj_layer(out)\
+                      .view(-1,
+                            self.gcn_pooled_layer_dims[0],
+                            self.gcn_pooled_layer_dims[0])
+       x = x_logits.tanh()
+       adj = F.softmax(adj_logits, -1) # should have effect of categorical sampling
 
     for i, (k_embed, k_pool) in enumerate(zip(self.embed_blocks, self.pool_blocks)):
       print(i, k_embed, k_pool)
@@ -152,5 +180,5 @@ class DiffPool(nn.Module):
       print("adj: {}".format(adj.shape))
 
     if self.module_type == "encoder":
-      z = self.mk_z(torch.reshape(x, (x.size(0), -1)))
+      z = self.encoder_z_layer(torch.reshape(x, (x.size(0), -1)))
       return z

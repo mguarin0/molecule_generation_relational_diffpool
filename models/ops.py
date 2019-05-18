@@ -41,6 +41,7 @@ class Model_Ops:
       adj, rel_adj, x, z, real_logPs = self.process_batch(mols, a, x, z)
       z = self.model((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)), "encoder")
       print(z.shape)
+      self.model((z), "decoder")
       exit(0)
 #     print(x_tensor.size())# [32, 9, 5]
 #     print(a.size()) # [32, 9, 9]
