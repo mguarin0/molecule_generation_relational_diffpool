@@ -43,7 +43,10 @@ class Model_Ops:
       print("================")
       print(z.shape)
       print("================")
-      self.model((z), "decoder")
+      x, adj = self.model((z), "decoder")
+      print("================")
+      print(x.shape, adj.shape)
+      print("================")
       exit(0)
 #     print(x_tensor.size())# [32, 9, 5]
 #     print(a.size()) # [32, 9, 9]

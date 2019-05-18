@@ -31,9 +31,7 @@ class DiPol_GraphVAE(nn.Module):
 
   def forward(self, input, module_type):
     if module_type == "encoder":
-      x, adj, rel_adj = input
-      return self.dipol_modules[module_type]((x, adj, rel_adj))
+      return self.dipol_modules[module_type](input)
     elif module_type == "decoder":
-      z = input
-      return self.dipol_modules[module_type]((z))
+      return self.dipol_modules[module_type](input)
 
