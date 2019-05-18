@@ -1,16 +1,24 @@
-from math import ceil
-import torch.nn as nn
+a = [128, 64, 32, 16]
+for m, (i, j) in enumerate(zip(a, a)):
+  if m==0:
+    a[0], a[0]
+  elif m%2==0 and m!=0:
+    a[m-1], a[m-1]
+  else:
+    a[m-1], a[m]
 
-class dp(nn.Module):
-  def __init__(self, nodes_dim=9):
-    super(dp, self).__init__()
-    self.node_dim = nodes_dim
-    pool_down_percent = [0.90, 0.75]
-    print([self.lnn_layer_dim(perc) for perc in pool_down_percent])
 
-  def lnn_layer_dim(self, pool_percent):
-    self.node_dim = ceil(self.node_dim * pool_percent)
-    return self.node_dim
-
-  def forward():
-  	print("forward")
+"""
+num_layers: 4
+hidden: 16
+Block(
+  (conv1): DenseSAGEConv(16, 16)
+  (conv2): DenseSAGEConv(16, 16)
+  (lin): Linear(in_features=32, out_features=16, bias=True)
+)
+Block(
+  (conv1): DenseSAGEConv(16, 16)
+  (conv2): DenseSAGEConv(16, 2)
+  (lin): Linear(in_features=18, out_features=2, bias=True)
+)
+"""
