@@ -77,9 +77,11 @@ class DiffPool(nn.Module):
                pool_rgcn_layer_params,
                embed_gcn_layer_params,
                pool_gcn_layer_params,
-               ff_layer_params):
+               ff_layer_params,
+               module_type):
     super(DiffPool, self).__init__()
 
+    self.module_type = module_type
     # TODO make this more dynamic low priority
     self.embed_blocks = nn.ModuleDict([
       ["rgcn", RGCN_Block(x_dim,
@@ -109,6 +111,14 @@ class DiffPool(nn.Module):
                             gcn_pooled_layer_dims[1],
                             pool_gcn_layer_params[1])]
       ])
+    if module_type == "encoder":
+      self.mk_z = nn.Sequential(Linear(gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
+                                       ff_layer_params[0][0]),
+                                nn.Tanh(),
+                                Linear(ff_layer_params[0][0],
+                                       z_dim))
+    #elif module_type == "decoder":
+     
 
   def get_pooled_layer_dims(self, n, pool_percents):
     pool_dims = []
@@ -117,14 +127,16 @@ class DiffPool(nn.Module):
       pool_dims.append(n)
     return pool_dims 
 
-  def forward(self, x, adj, rel_adj, mask=None):
+  def forward(self, input):
     """
     x: [b, n, f]
     adj: [b, n, n]
     mask: [b, n]
     """
-    print("x: {}".format(x.shape))
-    print("adj: {}".format(adj.shape))
+    if self.module_type == "encoder":
+       x, adj, rel_adj = input
+    elif self.module_type == "decoder":
+       z = input
 
     for i, (k_embed, k_pool) in enumerate(zip(self.embed_blocks, self.pool_blocks)):
       print(i, k_embed, k_pool)
@@ -135,10 +147,10 @@ class DiffPool(nn.Module):
       else:
         s = self.pool_blocks[k_pool](x, adj)
         x = self.embed_blocks[k_embed](x, adj)
-      print("x: {}".format(x.shape))
-      print("adj: {}".format(adj.shape))
-      print("s: {}".format(s.shape))
       x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
       print("x: {}".format(x.shape))
       print("adj: {}".format(adj.shape))
-    exit(0)
+
+    if self.module_type == "encoder":
+      z = self.mk_z(torch.reshape(x, (x.size(0), -1)))
+      return z
