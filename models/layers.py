@@ -123,7 +123,7 @@ class DiffPool(nn.Module):
                                                ff_layer_params[0][1]),
                                         nn.Tanh(),
                                         nn.Dropout(p=ff_layer_params[1], inplace=True))
-      self.disc = Linear(ff_layer_params[0][1], self.num_classes)
+      self.dscr = Linear(ff_layer_params[0][1], self.num_classes)
       
     elif module_type == "gen":
       self.embed_blocks = nn.ModuleDict([
@@ -167,8 +167,8 @@ class DiffPool(nn.Module):
     """
     if self.module_type == "dscr":
       x, adj, rel_adj = input
-      link_losses = []
-      ent_losses = []
+      lpls = []
+      les = []
       for i, (k_embed, k_pool) in enumerate(zip(self.embed_blocks, self.pool_blocks)):
         if k_embed=="rgcn" and k_pool=="rgcn":
           s = self.pool_blocks[k_pool](x, rel_adj)
@@ -176,11 +176,12 @@ class DiffPool(nn.Module):
         elif "_".join(k_embed.split("_")[:-1])=="gsage" and "_".join(k_pool.split("_")[:-1])=="gsage":
           s = self.pool_blocks[k_pool](x, adj)
           x = self.embed_blocks[k_embed](x, adj)
-        x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
-        link_losses.append(link_loss)
-        ent_losses.append(ent_loss)
+        x, adj, lpl, le = dense_diff_pool(x, adj, s)
+        lpls.append(lpl)
+        les.append(le)
       pred_logits = self.fc_graph_agg(torch.reshape(x, (x.size(0), -1)))
-      return pred_logits, link_losses, ent_losses
+      dscr_logits = self.dscr(pred_logits)
+      return dscr_logits, pred_logits, lpls, les
 
     elif self.module_type == "gen":
       z = input

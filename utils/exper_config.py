@@ -12,8 +12,9 @@ class Exper_Config:
   def __init__(self, num_epochs, batch_size,
                      learning_rate, rl_lambda,
                      optimize_for, n_samples,
-                     z_dim, chkpt_every, validate_every,
-                     dataset, use_cuda, model_config_file):
+                     z_dim, log_every, chkpt_every,
+                     validate_every, dataset,
+                     use_cuda, model_config_file):
     self.num_epochs = num_epochs
     self.batch_size = batch_size
     self.learning_rate = learning_rate
@@ -23,6 +24,7 @@ class Exper_Config:
     self.z_dim = z_dim
     self.train_gen = 1 
     self.num_classes = 1
+    self.log_every = log_every
     self.chkpt_every = chkpt_every
     self.validate_every = validate_every
     self.dataset = dataset
@@ -91,6 +93,8 @@ class Exper_Config:
   def set_curr_exper_name(self, curr_exper_name):
     self.curr_exper_name = "{}_{}".format(self.model_config_filename,
                                           curr_exper_name)
+    self.curr_exper_name_replica = "{}/{}".format(self.replica_num,
+                                                  self.curr_exper_name)
 
   def _get_exper_config(self, model_config_file):
     # assert yml extension

@@ -40,11 +40,14 @@ parser.add_argument("--n_samples",
 parser.add_argument("--z_dim",
                     default=32,
                     type=int)
+parser.add_argument("--log_every",
+                    default=128,
+                    type=int)
 parser.add_argument("--chkpt_every",
-                    default=5,
+                    default=1024,
                     type=int)
 parser.add_argument("--validate_every",
-                    default=512,
+                    default=2056,
                     type=int)
 parser.add_argument("--dataset",
                     default="qm9",
