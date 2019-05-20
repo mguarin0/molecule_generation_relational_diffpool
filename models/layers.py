@@ -2,7 +2,6 @@ from math import ceil
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn import Linear
 from torch_geometric.nn import DenseSAGEConv, dense_diff_pool
 
@@ -84,7 +83,7 @@ class DiffPool(nn.Module):
     self.num_classes = num_classes 
 
     # TODO make this more dynamic low priority
-    if module_type == "discriminator":
+    if module_type == "dscr":
       rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
       gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
 
@@ -92,25 +91,25 @@ class DiffPool(nn.Module):
         ["rgcn", RGCN_Block(d_dim,
                               embed_rgcn_layer_params[0],
                               embed_rgcn_layer_params[1])],
-        ["gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
+        ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
                               embed_gcn_layer_params[0][0],
                               embed_gcn_layer_params[0][0],
                               embed_gcn_layer_params[1])],
-        ["gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
-                                 embed_gcn_layer_params[0][0],
-                                 embed_gcn_layer_params[0][1],
-                                 embed_gcn_layer_params[1])]
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][0],
+                              embed_gcn_layer_params[0][1],
+                              embed_gcn_layer_params[1])]
         ])
 
       self.pool_blocks = nn.ModuleDict([
         ["rgcn", RGCN_Block(d_dim,
-                           rgcn_pooled_layer_dims,
-                           pool_rgcn_layer_params[1])],
-        ["gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
+                            rgcn_pooled_layer_dims,
+                            pool_rgcn_layer_params[1])],
+        ["gsage_1", GCN_Block(embed_rgcn_layer_params[0][-1],
                               embed_gcn_layer_params[0][0],
                               gcn_pooled_layer_dims[0],
                               pool_gcn_layer_params[1])],
-        ["gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
+        ["gsage_2", GCN_Block(embed_gcn_layer_params[0][0],
                               embed_gcn_layer_params[0][0],
                               gcn_pooled_layer_dims[1],
                               pool_gcn_layer_params[1])]
@@ -126,7 +125,7 @@ class DiffPool(nn.Module):
                                         nn.Dropout(p=ff_layer_params[1], inplace=True))
       self.disc = Linear(ff_layer_params[0][1], self.num_classes)
       
-    elif module_type == "generator":
+    elif module_type == "gen":
       self.embed_blocks = nn.ModuleDict([
         ["rgcn", RGCN_Block(d_dim,
                             embed_rgcn_layer_params[0]+[d_dim],
@@ -157,8 +156,6 @@ class DiffPool(nn.Module):
     for pool_percent in pool_percents:
       n = ceil(n * pool_percent)
       pool_dims.append(n)
-    if self.module_type == "decoder":
-      pool_dims = list(reversed(pool_dims))
     return pool_dims 
 
 
@@ -168,8 +165,10 @@ class DiffPool(nn.Module):
     adj: [b, n, n]
     mask: [b, n]
     """
-    if self.module_type == "discriminator":
+    if self.module_type == "dscr":
       x, adj, rel_adj = input
+      link_losses = []
+      ent_losses = []
       for i, (k_embed, k_pool) in enumerate(zip(self.embed_blocks, self.pool_blocks)):
         if k_embed=="rgcn" and k_pool=="rgcn":
           s = self.pool_blocks[k_pool](x, rel_adj)
@@ -178,17 +177,19 @@ class DiffPool(nn.Module):
           s = self.pool_blocks[k_pool](x, adj)
           x = self.embed_blocks[k_embed](x, adj)
         x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
-      out = self.fc_graph_agg(torch.reshape(x, (x.size(0), -1)))
-      return out, link_loss
+        link_losses.append(link_loss)
+        ent_losses.append(ent_loss)
+      pred_logits = self.fc_graph_agg(torch.reshape(x, (x.size(0), -1)))
+      return pred_logits, link_losses, ent_losses
 
-    elif self.module_type == "generator":
+    elif self.module_type == "gen":
       z = input
       out = self.decode_z_layer(z)
       x_logits  = self.x_layer(out)\
                     .view(-1,
                           self.n_dim,
                           self.d_dim)
-      adj_logits = self.adj_layer(out)\
+      rel_adj_logits = self.adj_layer(out)\
                      .view(-1,
                            self.r_dim,
                            self.n_dim,
@@ -200,12 +201,10 @@ class DiffPool(nn.Module):
 #                                                     (adj_logits.size(0), -1)))\
 #                    .view(-1, self.r_dim,
 #                          self.n_dim, self.n_dim)
-      adj_logits = (adj_logits + adj_logits.permute(0,1,3,2))/2 # avg permutation nodes 
-      adj_logits = self.decoder_dropout(adj_logits.permute(0,2,3,1))
+      rel_adj_logits = (rel_adj_logits + rel_adj_logits.permute(0,1,3,2))/2 # avg permutation nodes 
+      rel_adj_logits = self.decoder_dropout(rel_adj_logits.permute(0,2,3,1))
 #     x_logits = self.final_x_layer(torch.reshape(x, (x.size(0), -1)))\
 #                  .view(-1, self.n_dim,
 #                          self.d_dim)
       x_logits = self.decoder_dropout(x_logits)
-      adj = F.softmax(adj_logits/1.0, -1)
-      x = F.softmax(x_logits/1.0, -1)
-      return x, adj
+      return x_logits, rel_adj_logits
