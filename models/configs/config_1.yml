@@ -11,15 +11,15 @@ expers:
   # first experiment is 3 layers
   4_layer_dipol_gan:
     type: "DiPol_GAN"
-    encoder:
+    disc:
       embed_rgcn_layer_params: [[128, 64], 0.0]
       pool_rgcn_layer_params: [[0.90, 0.75], 0.0]
       embed_gcn_layer_params: [[32, 16], 0.0]
       pool_gcn_layer_params: [[0.50, 0.25], 0.0]
-      ff_layer_params: [[64, 16], 0.0] 
-    decoder:
+      ff_layer_params: [[128, 64], 0.0] 
+    gen:
       embed_rgcn_layer_params: [[64, 128], 0.0]
       pool_rgcn_layer_params: [[0.90, 0.75], 0.0]
       embed_gcn_layer_params: [[16, 32], 0.0]
       pool_gcn_layer_params: [[0.50, 0.25], 0.0]
-      ff_layer_params: [[32, 64], 0.0] 
+      ff_layer_params: [[64, 128], 0.0] 

@@ -2,32 +2,32 @@ import torch.nn as nn
 from models.layers import *
 
 class DiPol_GAN(nn.Module):
-  def __init__(self, x_dim, r_dim, n_dim, z_dim, num_classes, model_config):
+  def __init__(self, d_dim, r_dim, n_dim, z_dim, num_classes, model_config):
     super(DiPol_GAN, self).__init__()
 
     # encoder definition
     self.dipol_modules = nn.ModuleDict([
-      ["discriminator", DiffPool(x_dim,
+      ["discriminator", DiffPool(d_dim,
                           r_dim,
                           n_dim,
                           z_dim,
                           num_classes,
-                          model_config["encoder"]["embed_rgcn_layer_params"],
-                          model_config["encoder"]["pool_rgcn_layer_params"],
-                          model_config["encoder"]["embed_gcn_layer_params"],
-                          model_config["encoder"]["pool_gcn_layer_params"],
-                          model_config["encoder"]["ff_layer_params"],
+                          model_config["disc"]["embed_rgcn_layer_params"],
+                          model_config["disc"]["pool_rgcn_layer_params"],
+                          model_config["disc"]["embed_gcn_layer_params"],
+                          model_config["disc"]["pool_gcn_layer_params"],
+                          model_config["disc"]["ff_layer_params"],
                           "discriminator")],
-      ["generator", DiffPool(x_dim,
+      ["generator", DiffPool(d_dim,
                           r_dim,
                           n_dim,
                           z_dim,
                           num_classes,
-                          model_config["decoder"]["embed_rgcn_layer_params"],
-                          model_config["decoder"]["pool_rgcn_layer_params"],
-                          model_config["decoder"]["embed_gcn_layer_params"],
-                          model_config["decoder"]["pool_gcn_layer_params"],
-                          model_config["decoder"]["ff_layer_params"],
+                          model_config["gen"]["embed_rgcn_layer_params"],
+                          model_config["gen"]["pool_rgcn_layer_params"],
+                          model_config["gen"]["embed_gcn_layer_params"],
+                          model_config["gen"]["pool_gcn_layer_params"],
+                          model_config["gen"]["ff_layer_params"],
                           "generator")]
       ])
 
