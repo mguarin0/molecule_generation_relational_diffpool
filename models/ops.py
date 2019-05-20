@@ -25,6 +25,9 @@ class Model_Ops:
 
     return a, a_tensor, x_tensor, z, real_logPs 
 
+  def unrel(self, rel_adj):
+    return rel_adj.argmax(-1)
+
   #def log_performance(self):
     """ log performance here """
     # self.exper_config.summary_writer()
@@ -39,20 +42,15 @@ class Model_Ops:
       mols, _, _, a, x, _, _, _, _, z, _ = self.exper_config.data.next_train_batch(self.exper_config.batch_size,
                                                                                    self.exper_config.z_dim)
       adj, rel_adj, x, z, real_logPs = self.process_batch(mols, a, x, z)
-      z = self.model((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)), "encoder")
+
+      if step % self.exper_config.train_gen == 0:
+        x, rel_adj = self.model((z), "generator")
+        adj = self.unrel(rel_adj)
+      out, link_loss = self.model((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)), "discriminator")
       print("================")
-      print(z.shape)
-      print("================")
-      x, adj = self.model((z), "decoder")
-      print("================")
-      print(x.shape, adj.shape)
+      print(out.shape)
       print("================")
       exit(0)
-#     print(x_tensor.size())# [32, 9, 5]
-#     print(a.size()) # [32, 9, 9]
-#     print(a_tensor.size())# [32, 9, 9, 5]
-#     print(self.exper_config.data.bond_num_types) # 5 -1
-#     print(self.exper_config.data.bond_num_types) # 5
 
 #     if step % self.exper_config.validate_every == 0: 
 #       self.validate()
@@ -71,11 +69,12 @@ class Model_Ops:
 #   a_tensor, x_tensor, z, real_logPs = self.process_batch(mols, a, x, z)
 
   def _model_builder(self):
-    if self.exper_config.model_config["type"] == "DiPol_GraphVAE":
-      from models.models import DiPol_GraphVAE
-      self.model = DiPol_GraphVAE(self.exper_config.data.atom_num_types, # TODO will change
-                                  self.exper_config.data.bond_num_types-1, # TODO will change
-                                  self.exper_config.num_vertices,
-                                  self.exper_config.z_dim,
-                                  self.exper_config.model_config)
+    if self.exper_config.model_config["type"] == "DiPol_GAN":
+      from models.models import DiPol_GAN
+      self.model = DiPol_GAN(self.exper_config.data.atom_num_types, # TODO will change
+                             self.exper_config.data.bond_num_types-1, # TODO will change
+                             self.exper_config.num_vertices,
+                             self.exper_config.z_dim,
+                             self.exper_config.num_classes,
+                             self.exper_config.model_config)
       self.model.to(self.exper_config.device)

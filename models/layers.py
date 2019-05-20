@@ -52,10 +52,11 @@ class GCN_Block(nn.Module):
     for layer in self.layers:
       layer.reset_parameters()
 
-  def forward(self, x, adj, mask=None, add_loop=True):
+  def forward(self, x, adj, activation=None, mask=None, add_loop=True):
     xs = []
     for gcn_layer in self.gcn_layers:
-      x = F.relu(gcn_layer(x, adj))
+      x = gcn_layer(x, adj)
+      x = activation(x) if activation is not None else x 
       xs.append(x)
     return self.ff_layer(torch.cat([xs[-2],
                                     xs[-1]], dim=-1))
@@ -66,6 +67,7 @@ class DiffPool(nn.Module):
                r_dim,
                n_dim,
                z_dim,
+               num_classes,
                embed_rgcn_layer_params,
                pool_rgcn_layer_params,
                embed_gcn_layer_params,
@@ -79,46 +81,49 @@ class DiffPool(nn.Module):
     self.r_dim = r_dim
     self.n_dim = n_dim
     self.z_dim = z_dim
+    self.num_classes = num_classes 
 
     # TODO make this more dynamic low priority
-    if module_type == "encoder":
+    if module_type == "discriminator":
+      rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
+      gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
+
       self.embed_blocks = nn.ModuleDict([
-        ["e_rgcn", RGCN_Block(x_dim,
+        ["rgcn", RGCN_Block(x_dim,
                               embed_rgcn_layer_params[0],
                               embed_rgcn_layer_params[1])],
-        ["e_gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
+        ["gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
                                 embed_gcn_layer_params[0][0],
                                 embed_gcn_layer_params[0][0],
                                 embed_gcn_layer_params[1])],
-        ["e_gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
+        ["gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
                                  embed_gcn_layer_params[0][0],
                                  embed_gcn_layer_params[0][1],
                                  embed_gcn_layer_params[1])]
         ])
-      rgcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_rgcn_layer_params[0])
-      gcn_pooled_layer_dims = self.get_pooled_layer_dims(n_dim, pool_gcn_layer_params[0])
+
       self.pool_blocks = nn.ModuleDict([
-        ["e_rgcn", RGCN_Block(x_dim,
+        ["rgcn", RGCN_Block(x_dim,
                            rgcn_pooled_layer_dims,
                            pool_rgcn_layer_params[1])],
-        ["e_gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
+        ["gsage_l", GCN_Block(embed_rgcn_layer_params[0][-1],
                               embed_gcn_layer_params[0][0],
                               gcn_pooled_layer_dims[0],
                               pool_gcn_layer_params[1])],
-        ["e_gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
+        ["gsage_ll", GCN_Block(embed_gcn_layer_params[0][0],
                               embed_gcn_layer_params[0][0],
                               gcn_pooled_layer_dims[1],
                               pool_gcn_layer_params[1])]
         ])
 
-      self.encoder_z_layer = nn.Sequential(Linear(gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
+      self.disc = nn.Sequential(Linear(gcn_pooled_layer_dims[1] * embed_gcn_layer_params[0][1],
                                        ff_layer_params[0][0]),
-                                nn.Tanh(),
-                                Linear(ff_layer_params[0][0],
-                                       z_dim))
-    elif module_type == "decoder":
+                                       nn.Tanh(),
+                                       Linear(ff_layer_params[0][0],
+                                       num_classes))
+    elif module_type == "generator":
       self.embed_blocks = nn.ModuleDict([
-        ["d_rgcn", RGCN_Block(x_dim,
+        ["rgcn", RGCN_Block(x_dim,
                               embed_rgcn_layer_params[0]+[x_dim],
                               embed_rgcn_layer_params[1])]
         ])
@@ -128,19 +133,18 @@ class DiffPool(nn.Module):
         self.decode_z_layers.append(nn.Linear(ln, lnn))
         self.decode_z_layers.append(nn.Tanh())
         self.decode_z_layers.append(nn.Dropout(p=ff_layer_params[1], inplace=True))
-
       self.decode_z_layer = nn.Sequential(*self.decode_z_layers)
       self.decoder_dropout = nn.Dropout(p=ff_layer_params[1])
       self.x_layer = Linear(ff_layer_params[0][-1], x_dim*n_dim)
       self.adj_layer = Linear(ff_layer_params[0][-1], (n_dim**2)*r_dim)
-      self.final_adj_layer = nn.Sequential(Linear((n_dim**2)*r_dim, 512),
-                                           nn.ReLU(),
-                                           nn.Dropout(p=0.5, inplace=True),
-                                           Linear(512, (n_dim**2)*r_dim))
-      self.final_x_layer = nn.Sequential(Linear(n_dim*x_dim, 128),
-                                         nn.ReLU(),
-                                         nn.Dropout(p=0.5, inplace=True),
-                                         Linear(128, n_dim*x_dim))
+#     self.final_adj_layer = nn.Sequential(Linear((n_dim**2)*r_dim, 512),
+#                                          nn.ReLU(),
+#                                          nn.Dropout(p=0.5, inplace=True),
+#                                          Linear(512, (n_dim**2)*r_dim))
+#     self.final_x_layer = nn.Sequential(Linear(n_dim*x_dim, 128),
+#                                        nn.ReLU(),
+#                                        nn.Dropout(p=0.5, inplace=True),
+#                                        Linear(128, n_dim*x_dim))
 
 
   def get_pooled_layer_dims(self, n, pool_percents):
@@ -159,42 +163,43 @@ class DiffPool(nn.Module):
     adj: [b, n, n]
     mask: [b, n]
     """
-    if self.module_type == "encoder":
+    if self.module_type == "discriminator":
       x, adj, rel_adj = input
       for i, (k_embed, k_pool) in enumerate(zip(self.embed_blocks, self.pool_blocks)):
-        if k_embed=="e_rgcn" and k_pool=="e_rgcn":
+        if k_embed=="rgcn" and k_pool=="rgcn":
           s = self.pool_blocks[k_pool](x, rel_adj)
           x = self.embed_blocks[k_embed](x, rel_adj)
-        elif "_".join(k_embed.split("_")[:-1])=="e_gsage" and "_".join(k_pool.split("_")[:-1])=="e_gsage":
+        elif "_".join(k_embed.split("_")[:-1])=="gsage" and "_".join(k_pool.split("_")[:-1])=="gsage":
           s = self.pool_blocks[k_pool](x, adj)
           x = self.embed_blocks[k_embed](x, adj)
         x, adj, link_loss, ent_loss = dense_diff_pool(x, adj, s)
-      z = self.encoder_z_layer(torch.reshape(x, (x.size(0), -1)))
-      return z
+      out = self.disc(torch.reshape(x, (x.size(0), -1)))
+      return out, link_loss
 
-    elif self.module_type == "decoder":
+    elif self.module_type == "generator":
       z = input
       out = self.decode_z_layer(z)
-      x  = self.x_layer(out)\
-             .view(-1,
-                   self.n_dim,
-                   self.x_dim)
-      adj = self.adj_layer(out)\
-              .view(-1,
-                    self.r_dim,
-                    self.n_dim,
-                    self.n_dim)
-      for k_embed in self.embed_blocks:
-        if "_".join(k_embed.split("_")[:-1])=="d_rgcn":
-          x = self.embed_blocks[k_embed](x, rel_adj)
-      adj_logits = self.final_adj_layer(torch.reshape(adj, (adj.size(0), -1)))\
-                     .view(-1, self.r_dim,
-                           self.n_dim, self.n_dim)
+      x_logits  = self.x_layer(out)\
+                    .view(-1,
+                          self.n_dim,
+                          self.x_dim)
+      adj_logits = self.adj_layer(out)\
+                     .view(-1,
+                           self.r_dim,
+                           self.n_dim,
+                           self.n_dim)
+#     for k_embed in self.embed_blocks:
+#       if "_".join(k_embed.split("_")[:-1])=="rgcn":
+#         x = self.embed_blocks[k_embed](x, rel_adj)
+#     adj_logits = self.final_adj_layer(torch.reshape(adj_logits,
+#                                                     (adj_logits.size(0), -1)))\
+#                    .view(-1, self.r_dim,
+#                          self.n_dim, self.n_dim)
       adj_logits = (adj_logits + adj_logits.permute(0,1,3,2))/2 
       adj_logits = self.decoder_dropout(adj_logits.permute(0,2,3,1))
-      x_logits = self.final_x_layer(torch.reshape(x, (x.size(0), -1)))\
-                   .view(-1, self.n_dim,
-                           self.x_dim)
+#     x_logits = self.final_x_layer(torch.reshape(x, (x.size(0), -1)))\
+#                  .view(-1, self.n_dim,
+#                          self.x_dim)
       x_logits = self.decoder_dropout(x_logits)
       adj = F.softmax(adj_logits/1.0, -1)
       x = F.softmax(x_logits/1.0, -1)

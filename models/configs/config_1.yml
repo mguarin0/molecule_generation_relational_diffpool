@@ -9,8 +9,8 @@ seeds:
                 503440]
 expers:
   # first experiment is 3 layers
-  4_layer_dipol_gvae:
-    type: "DiPol_GraphVAE"
+  4_layer_dipol_gan:
+    type: "DiPol_GAN"
     encoder:
       embed_rgcn_layer_params: [[128, 64], 0.0]
       pool_rgcn_layer_params: [[0.90, 0.75], 0.0]

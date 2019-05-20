@@ -21,6 +21,8 @@ class Exper_Config:
     self.optimize_for = optimize_for
     self.n_samples = n_samples 
     self.z_dim = z_dim
+    self.train_gen = 1 
+    self.num_classes = 1
     self.chkpt_every = chkpt_every
     self.validate_every = validate_every
     self.dataset = dataset
