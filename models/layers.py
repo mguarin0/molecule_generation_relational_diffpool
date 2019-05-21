@@ -124,6 +124,7 @@ class DiffPool(nn.Module):
                                         nn.Tanh(),
                                         nn.Dropout(p=ff_layer_params[1], inplace=True))
       self.dscr = Linear(ff_layer_params[0][1], self.num_classes)
+      self.value = Linear(ff_layer_params[0][1], self.num_classes)
       
     elif module_type == "gen":
       self.embed_blocks = nn.ModuleDict([
@@ -181,7 +182,8 @@ class DiffPool(nn.Module):
         les.append(le)
       pred_logits = self.fc_graph_agg(torch.reshape(x, (x.size(0), -1)))
       dscr_logits = self.dscr(pred_logits)
-      return dscr_logits, pred_logits, lpls, les
+      value_logits = self.value(pred_logits)
+      return value_logits, dscr_logits, pred_logits, lpls, les
 
     elif self.module_type == "gen":
       z = input

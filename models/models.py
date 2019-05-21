@@ -69,8 +69,9 @@ class DiPol_Dscr(nn.Module):
                          model_config["dscr"]["ff_layer_params"],
                          "dscr")
   def forward(self, input):
-    dscr_logits, pred_logits, lpls, les = self.dscr(input)
-    return torch.sigmoid(dscr_logits).view(-1),\
+    value_logits, dscr_logits, pred_logits, lpls, les = self.dscr(input)
+    return value_logits,
+           torch.sigmoid(dscr_logits).view(-1),\
            pred_logits,\
            torch.sum(torch.stack(lpls)),\
            torch.sum(torch.stack(les))

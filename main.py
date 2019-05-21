@@ -37,6 +37,9 @@ parser.add_argument("--optimize_for",
 parser.add_argument("--n_samples",
                     default=6400,
                     type=int)
+parser.add_argument("--n_critic",
+                    default=5,
+                    type=int)
 parser.add_argument("--z_dim",
                     default=32,
                     type=int)

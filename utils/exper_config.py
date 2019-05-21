@@ -12,8 +12,8 @@ class Exper_Config:
   def __init__(self, num_epochs, batch_size,
                      learning_rate, rl_lambda,
                      optimize_for, n_samples,
-                     z_dim, log_every, chkpt_every,
-                     validate_every, dataset,
+                     n_critic, z_dim, log_every,
+                     chkpt_every, validate_every, dataset,
                      use_cuda, model_config_file):
     self.num_epochs = num_epochs
     self.batch_size = batch_size
@@ -22,7 +22,7 @@ class Exper_Config:
     self.optimize_for = optimize_for
     self.n_samples = n_samples 
     self.z_dim = z_dim
-    self.train_gen = 1 
+    self.n_critic = n_critic 
     self.num_classes = 1
     self.log_every = log_every
     self.chkpt_every = chkpt_every
