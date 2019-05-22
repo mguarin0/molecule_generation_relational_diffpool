@@ -24,6 +24,7 @@ class Model_Ops:
         self.generator_beta_2 = self.exper_config.model_config["gen"]["optimizer"][2]
         self.discriminator_beta_1 = self.exper_config.model_config["dscr"]["optimizer"][1]
         self.discriminator_beta_2 = self.exper_config.model_config["dscr"]["optimizer"][2]
+        self.chkpt_path = self.exper_config.set_chkpt_path(os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica))
         self._model_builder()
 
     def _model_builder(self):
@@ -96,12 +97,9 @@ class Model_Ops:
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from step {}...'.format(resume_iters))
-        G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                              '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                              '{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                              '{}-V.ckpt'.format(resume_iters))
+        G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(resume_iters))
+        D_path = os.path.join(self.chkpt_path,'{}-D.ckpt'.format(resume_iters))
+        V_path = os.path.join(self.chkpt_path,'{}-V.ckpt'.format(resume_iters))
         self.generator.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.value.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
@@ -441,19 +439,31 @@ class Model_Ops:
                                                  name),
                             param,
                             int(step))
+                for name, param in self.generator.named_parameters():
+                    if param.requires_grad == True:
+                        self.exper_config.summary_writer.add_histogram(
+                            "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
+                                                 name),
+                            param,
+                            int(step))
+                for name, param in self.value.named_parameters():
+                    if param.requires_grad == True:
+                        self.exper_config.summary_writer.add_histogram(
+                            "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
+                                                 name),
+                            param,
+                            int(step))
 
             # Save model checkpoints.
             if (step + 1) % self.exper_config.chkpt_every == 0 and step is not 0:
-                G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                                      '{}-G.ckpt'.format(step + 1))
-                D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                                      '{}-D.ckpt'.format(step + 1))
-                V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
-                                      '{}-V.ckpt'.format(step + 1))
+                G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(step+1))
+                D_path = os.path.join(self.chkpt_path,'{}-D.ckpt'.format(step+1))
+                V_path = os.path.join(self.chkpt_path,'{}-V.ckpt'.format(step+1))
+
                 torch.save(self.generator.state_dict(), G_path)
                 torch.save(self.discriminator.state_dict(), D_path)
                 torch.save(self.value.state_dict(), V_path)
-                print('Saved model checkpoints into {}...'.format(self.model_save_dir))
+                print('Saved model checkpoints into {}...'.format(self.chkpt_path))
 
             if step % self.exper_config.validate_every == 0 and step is not 0:
                 self.validate(step)

@@ -3,6 +3,7 @@ from torch.backends.cudnn import benchmark, deterministic
 from numpy.random import seed as numpy_set_seed
 from os.path import join, abspath, curdir, exists
 from os import mkdir
+from pathlib import Path
 import yaml
 from tensorboardX import SummaryWriter
 from data.sparse_molecular_dataset import SparseMolecularDataset
@@ -40,7 +41,6 @@ class Exper_Config:
     self.seeds = self.model_configs["seeds"]
     self.total_replica_num = len(self.seeds)
     self._set_seeds()
-    self.log_curr_exper_name_replica = self._get_resultsFile()
 
   def _set_seeds(self):
     # set torch and numpy seeds
@@ -74,10 +74,14 @@ class Exper_Config:
             "EXPER_CHKPTS_DIR": join(EXPER_RESULTS_DIR, "chkpts")
             }
     for path in sorted(self.paths.values(), key=lambda x: len(x.split("/"))):
-      self._mk_prjPaths(path)
+      self._mk_prjPath(path)
+
+  def _mk_prjPath(self, path):
+    if not exists(path): mkdir(path)
 
   def _mk_prjPaths(self, path):
-    if not exists(path): mkdir(path)
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
 
   def _load_dataset(self):
     if self.dataset=="qm9":
@@ -96,6 +100,9 @@ class Exper_Config:
                                           curr_exper_name)
     self.curr_exper_name_replica = "{}/{}".format(self.replica_num,
                                                   self.curr_exper_name)
+    self.results_curr_exper_name_replica = self._get_resultsFile("results")
+    self.time_curr_exper_name_replica = self._get_resultsFile("time")
+
 
   def _get_exper_config(self, model_config_file):
     # assert yml extension
@@ -107,5 +114,10 @@ class Exper_Config:
   def _get_SummaryWriter(self):
     return SummaryWriter(self.paths["EXPER_SUMMAIRES_DIR"])
 
-  def _get_resultsFile(self):
-    return open(join(self.paths["EXPER_LOG_DIR"], self.curr_exper_name_replica), "w")
+  def _get_resultsFile(self, type_):
+    self._mk_prjPaths(join(self.paths["EXPER_LOG_DIR"], self.curr_exper_name_replica))
+    return open(join(self.paths["EXPER_LOG_DIR"], self.curr_exper_name_replica, type_+".txt"), "w+")
+  
+  def set_chkpt_path(self, path):
+    self._mk_prjPaths(path)
+    return path
