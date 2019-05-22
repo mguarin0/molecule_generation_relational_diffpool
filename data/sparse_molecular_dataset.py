@@ -312,7 +312,7 @@ class SparseMolecularDataset():
         results.append(z)
         return results
 
-    def next_validation_batch(self, batch_size=None):
+    def next_validation_batch(self, z_dim, batch_size=None):
         """
         desc:
         """
@@ -326,7 +326,7 @@ class SparseMolecularDataset():
 
         return out[1:]
 
-    def next_test_batch(self, batch_size=None):
+    def next_test_batch(self, z_dim, batch_size=None):
         """
         desc:
         """
