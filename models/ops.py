@@ -212,9 +212,8 @@ class Model_Ops:
             z, adj, rel_adj, x = self.process_batch(z, a, x)
 
             # Z-to-target
-            edges_logits, nodes_logits = self.generator(z)
             # Postprocess with Gumbel softmax
-            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits))
+            nodes_hat, edges_hat  = self.generator(z)
             logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
@@ -245,9 +244,8 @@ class Model_Ops:
             mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count, self.exper_config.z_dim)
             z, adj, rel_adj, x = self.process_batch(z, a, x)
             # Z-to-target
-            edges_logits, nodes_logits = self.generator(z)
             # Postprocess with Gumbel softmax
-            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits))
+            nodes_hat, edges_hat  = self.generator(z)
             logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
