@@ -318,6 +318,10 @@ class Model_Ops:
                 self.discriminator_optimizer.step()
 
             if step % self.exper_config.log_every == 0 and step is not 0:
+                print(step)
+                print(type(step))
+                print(generator_diffpool_losses[0].to("cpu").detach().numpy())
+                print(generator_diffpool_losses[1].to("cpu").detach().numpy())
 
 #               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
 #               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
@@ -330,7 +334,7 @@ class Model_Ops:
                      "generator_novel": np.mean(generator_novel),
                      "generator_diverse": np.mean(generator_diverse),
                      "generator_drug_candidate_score": np.mean(generator_drug_candidate_score)},
-                    step)
+                    int(step))
 #               self.exper_config.summary_writer.add_scalars(
 #                   "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
 #                   {"fake_discriminator_accuracy": fake_discriminator_accuracy,
@@ -339,14 +343,14 @@ class Model_Ops:
 #                   step)
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/generator_losses".format(self.exper_config.curr_exper_name_replica),
-                    {"fake_generator_loss": fake_generator_loss.to("cpu").detach().numpy(),
-                     "generator_loss": generator_loss.to("cpu").detach().numpy(),
-                     "generator_loss_value": generator_loss_value.to("cpu").detach().numpy(),
-                     "real_reward": real_reward.to("cpu").detach().numpy(),
-                     "fake_reward": fake_reward.to("cpu").detach().numpy(),
-                     "generator_diffpool_losses[0]": generator_diffpool_losses[0].to("cpu").detach().numpy(),
-                     "generator_diffpool_losses[1]": generator_diffpool_losses[1].to("cpu").detach().numpy()},
-                    step)
+                    {"fake_generator_loss": np.mean(fake_generator_loss.to("cpu").detach().numpy()),
+                     "generator_loss": np.mean(generator_loss.to("cpu").detach().numpy()),
+                     "generator_loss_value": np.mean(generator_loss_value.to("cpu").detach().numpy()),
+                     "real_reward": np.mean(real_reward.to("cpu").detach().numpy()),
+                     "fake_reward": np.mean(fake_reward.to("cpu").detach().numpy()),
+                     "generator_diffpool_losses[0]": np.mean(generator_diffpool_losses[0].to("cpu").detach().numpy()),
+                     "generator_diffpool_losses[1]": np.mean(generator_diffpool_losses[1].to("cpu").detach().numpy())},
+                    int(step))
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/real_discriminator_losses".format(self.exper_config.curr_exper_name_replica),
                     {"real_discriminator_loss": real_discriminator_loss.to("cpu").detach().numpy(),
@@ -356,14 +360,14 @@ class Model_Ops:
                      "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to("cpu").detach().numpy(),
                      "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
                      "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to("cpu").detach().numpy()},
-                    step)
+                    int(step))
                 for name, param in self.discriminator.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
                             "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
                                                  name),
                             param,
-                            step)
+                            int(step))
 
             # Save model checkpoints.
             if (step + 1) % self.exper_config.chkpt_every == 0:
