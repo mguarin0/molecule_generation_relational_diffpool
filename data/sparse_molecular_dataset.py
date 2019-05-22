@@ -324,7 +324,7 @@ class SparseMolecularDataset():
         results = out[1:]
         results.append(z)
 
-        return out[1:]
+        return results
 
     def next_test_batch(self, batch_size, z_dim):
         """
@@ -337,7 +337,7 @@ class SparseMolecularDataset():
         results = out[1:]
         results.append(z)
 
-        return out[1:]
+        return results
 
     @staticmethod
     def log(msg='', date=True):
