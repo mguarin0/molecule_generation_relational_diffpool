@@ -183,7 +183,7 @@ class DiffPool(nn.Module):
       pred_logits = self.fc_graph_agg(torch.reshape(x, (x.size(0), -1)))
       dscr_logits = self.dscr(pred_logits)
       value_logits = self.value(pred_logits)
-      return value_logits, dscr_logits, pred_logits, lpls, les
+      return value_logits, dscr_logits, lpls, les
 
     elif self.module_type == "gen":
       z = input

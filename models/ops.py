@@ -5,14 +5,14 @@ from torch import optim
 from torch.autograd import Variable
 from utils.utils import *
 from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
+import torch.nn.functional as F
 
 class Model_Ops:
     def __init__(self, exper_config):
 
-        self.metric = "validity, dc"
+        self.metric = "validity"
         self.first_log = True
         self.exper_config = exper_config
-        self._model_builder()
         self.chem_metrics_ = self.performance_metrics("chem_metrics")
         self.average_precision_scores_ = self.performance_metrics("average_precision_score")
         self.roc_auc_scores_ = self.performance_metrics("roc_auc_score")
@@ -21,24 +21,25 @@ class Model_Ops:
         self.generator_beta_2 = self.exper_config.model_config["gen"]["optimizer"][2]
         self.discriminator_beta_1 = self.exper_config.model_config["dscr"]["optimizer"][1]
         self.discriminator_beta_2 = self.exper_config.model_config["dscr"]["optimizer"][2]
+        self._model_builder()
 
     def _model_builder(self):
         if self.exper_config.model_config["type"] == "DiPol_GAN":
             from models.models import DiPol_Gen, DiPol_Dscr
             self.generator = DiPol_Gen(self.exper_config.data.atom_num_types,  # TODO will change
-                                       self.exper_config.data.bond_num_types - 1,  # TODO will change
+                                       self.exper_config.data.bond_num_types,  # TODO will change
                                        self.exper_config.num_vertices,
                                        self.exper_config.z_dim,
                                        self.exper_config.num_classes,
                                        self.exper_config.model_config)
             self.discriminator = DiPol_Dscr(self.exper_config.data.atom_num_types,  # TODO will change
-                                            self.exper_config.data.bond_num_types - 1,  # TODO will change
+                                            self.exper_config.data.bond_num_types,  # TODO will change
                                             self.exper_config.num_vertices,
                                             self.exper_config.z_dim,
                                             self.exper_config.num_classes,
                                             self.exper_config.model_config)
             self.value = DiPol_Dscr(self.exper_config.data.atom_num_types,  # TODO will change
-                                    self.exper_config.data.bond_num_types - 1,  # TODO will change
+                                    self.exper_config.data.bond_num_types,  # TODO will change
                                     self.exper_config.num_vertices,
                                     self.exper_config.z_dim,
                                     self.exper_config.num_classes,
@@ -138,7 +139,7 @@ class Model_Ops:
 
     def gradient_penalty(self, y, x):
         """Compute gradient penalty: (L2_norm(dy/dx) - 1)**2."""
-        weight = torch.ones(y.size()).to(self.device)
+        weight = torch.ones(y.size()).to(self.exper_config.device)
         dydx = torch.autograd.grad(outputs=y,
                                    inputs=x,
                                    grad_outputs=weight,
@@ -155,7 +156,7 @@ class Model_Ops:
             """ pass in hard gumbel softmaxes for x and rel_adj"""
             mols = [self.exper_config.data.matrices2mol(node.data.to("cpu").numpy(), edge.data.to("cpu").numpy(),
                                                         strict=True)
-                    for node, edge in zip(hx.argmax(-1), hrel_adj.argmax(-1))]
+                    for node, edge in zip(hx, hrel_adj)]
             valid = MolecularMetrics.valid_scores(mols)
             unique = MolecularMetrics.unique_scores(mols)
             novel = MolecularMetrics.novel_scores(mols, self.exper_config.data)
@@ -227,21 +228,16 @@ class Model_Ops:
             # ----------------------------------------------------------#
             if step % self.exper_config.n_critic == 0 and step is not 0:
                 # gen training mode
-                self.generator.train()
-
                 # -----------------------------------#
                 #           train with fake          #
                 # -----------------------------------#
 
-                hx, hrel_adj, _, _ = self.generator((z))  # descritize input to discriminator
+                hx, hrel_adj = self.generator((z))  # descritize input to discriminator
                 generator_train_discriminator_preds, generator_train_discriminator_logits, generator_diffpool_losses = self.discriminator(
                     (hx,
                      hrel_adj.argmax(
                          -1).float(),
-                     hrel_adj[
-                     :, :,
-                     :,
-                     1:] \
+                     hrel_adj[:,:,:,1:] \
                      .permute(
                          0,
                          3,
@@ -260,36 +256,33 @@ class Model_Ops:
                 # -----------------------------------#
                 # TODO don't need to call generator twice (if problem check here
                 _, _, hx, hrel_adj = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
-                hx, hrel_adj = hx.argmax(-1), hrel_adj.argmax(-1)
-                mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
-                        for e_, n_ in zip(hrel_adj, hx)]
+                hx_, hrel_adj_ = hx.argmax(-1), hrel_adj.argmax(-1)
+                mols = [self.exper_config.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
+                        for e_, n_ in zip(hrel_adj_, hx_)]
                 generator_valid, generator_unique, generator_novel, generator_diverse, generator_drug_candidate_score = self.chem_metrics_(
-                    hx, hrel_adj)
-                fake_reward = torch.from_numpy(self.reward(mols)).to(self.device)
+                    hx_, hrel_adj_)
+                fake_reward = torch.from_numpy(self.reward(mols)).to(self.exper_config.device)
 
                 # Value loss
-                real_value_logit, _, _, real_value_diff_pool_losses = self.value(adj, None, x, torch.sigmoid)
-                fake_value_logit, _, _, real_value_diff_pool_losses = self.value(hrel_adj, None, hx, torch.sigmoid)
-                generator_loss_value = torch.mean((real_value_logit - real_reward) ** 2 + (
-                        fake_value_logit - fake_reward) ** 2)
+                real_value_logit, _, real_value_diff_pool_losses = self.value((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)))
+                fake_value_logit, _, real_value_diff_pool_losses = self.value((hx, hrel_adj.argmax(-1).float(), hrel_adj[:,:,:,1:].permute(0,3,1,2)))
+                generator_loss_value = torch.mean((F.sigmoid(real_value_logit) - real_reward) ** 2 + (
+                        F.sigmoid(fake_value_logit) - fake_reward) ** 2)
 
                 # Backward and optimize.
                 generator_loss = fake_generator_loss + generator_loss_value
-                self.reset_grad()
+                self.generator_optimizer.zero_grad()
+                self.discriminator_optimizer.zero_grad()
                 generator_loss.backward()
-                self.g_optimizer.step()
+                self.generator_optimizer.step()
 
             # ----------------------------------------------------------#
             #                     train discriminator                   #
             # ----------------------------------------------------------#
             else:
-                # dscr training mode
-                self.generator.detach()
-
                 # -----------------------------------#
                 #           train with real          #
                 # -----------------------------------#
-
                 real_discriminator_preds, real_discriminator_logits, real_discriminator_diffpool_losses = self.discriminator(
                     (x,
                      adj.float(),
@@ -301,7 +294,7 @@ class Model_Ops:
                 # -----------------------------------#
                 #           train with fake          #
                 # -----------------------------------#
-                hx, hrel_adj, _, _ = self.generator((z))
+                hx, hrel_adj = self.generator((z))
                 fake_discriminator_preds, fake_discriminator_logits, fake_discriminator_diffpool_losses = self.discriminator(
                     (hx,
                      hrel_adj.argmax(-1).float(),
@@ -310,24 +303,25 @@ class Model_Ops:
                 fake_discriminator_loss = torch.mean(fake_discriminator_logits)
 
                 # Compute loss for gradient penalty.
-                eps = torch.rand(real_discriminator_logits.size(0), 1, 1, 1).to(self.device)
+                eps = torch.rand(real_discriminator_logits.size(0), 1, 1, 1).to(self.exper_config.device)
                 x_int0 = (eps * rel_adj + (1. - eps) * hrel_adj).requires_grad_(True)
                 x_int1 = (eps.squeeze(-1) * x + (1. - eps.squeeze(-1)) * hx).requires_grad_(True)
-                grad0, grad1 = self.discriminator(x_int1, x_int0.argmax(-1), x_int0[:,:,:,1:])
+                grad0, grad1, _ = self.discriminator((x_int1, x_int0.argmax(-1).float(), x_int0[:,:,:,1:].permute(0, 3, 1, 2)))
                 discriminator_loss_w_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1)
 
                 # train dscr real and fake losses
                 discriminator_loss = real_discriminator_loss + fake_discriminator_loss + \
                                      self.exper_config.model_config["dscr"]["lambda_gp"] * discriminator_loss_w_gp
                 self.discriminator_optimizer.zero_grad()
+                self.generator_optimizer.zero_grad()
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
             if step % self.exper_config.log_every == 0 and step is not 0:
 
-                fake_discriminator_accuracy = self.accuracy_scores(fake_label_var, fake_discriminator_preds)
-                real_discriminator_accuracy = self.accuracy_scores(real_label_var, real_discriminator_preds)
-                generator_accuracy = self.accuracy_scores(fake_label_var, generator_train_discriminator_preds)
+#               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
+#               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
+#               generator_accuracy = self.accuracy_scores_(fake_label_var, generator_train_discriminator_preds)
 
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/chem_metrics".format(self.exper_config.curr_exper_name_replica),
@@ -337,12 +331,12 @@ class Model_Ops:
                      "generator_diverse": np.mean(generator_diverse),
                      "generator_drug_candidate_score": np.mean(generator_drug_candidate_score)},
                     step)
-                self.exper_config.summary_writer.add_scalars(
-                    "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
-                    {"fake_discriminator_accuracy": fake_discriminator_accuracy,
-                     "real_discriminator_accuracy": real_discriminator_accuracy,
-                     "generator_accuracy": generator_accuracy},
-                    step)
+#               self.exper_config.summary_writer.add_scalars(
+#                   "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
+#                   {"fake_discriminator_accuracy": fake_discriminator_accuracy,
+#                    "real_discriminator_accuracy": real_discriminator_accuracy,
+#                    "generator_accuracy": generator_accuracy},
+#                   step)
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/generator_losses".format(self.exper_config.curr_exper_name_replica),
                     {"fake_generator_loss": fake_generator_loss.to("cpu").detach().numpy(),
@@ -363,9 +357,6 @@ class Model_Ops:
                      "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
                      "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to("cpu").detach().numpy()},
                     step)
-                self.exper_config.summary_writer.add_scalars(
-                    step)
-
                 for name, param in self.discriminator.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
@@ -375,16 +366,16 @@ class Model_Ops:
                             step)
 
             # Save model checkpoints.
-            if (i + 1) % self.model_save_step == 0:
+            if (step + 1) % self.exper_config.chkpt_every == 0:
                 G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
-                                      '{}-G.ckpt'.format(i + 1))
+                                      '{}-G.ckpt'.format(step + 1))
                 D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
-                                      '{}-D.ckpt'.format(i + 1))
+                                      '{}-D.ckpt'.format(step + 1))
                 V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
-                                      '{}-V.ckpt'.format(i + 1))
+                                      '{}-V.ckpt'.format(step + 1))
                 torch.save(self.generator.state_dict(), G_path)
                 torch.save(self.discriminator.state_dict(), D_path)
-                torch.save(self.V.state_dict(), V_path)
+                torch.save(self.value.state_dict(), V_path)
                 print('Saved model checkpoints into {}...'.format(self.model_save_dir))
 
             if step % self.exper_config.validate_every == 0:

@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
   exper_config = Exper_Config(**vars(args))
 
-  if exper_config["run_type"] == "train":
+  if args.run_type == "train":
     # run all experiments
     for model_k in exper_config.model_configs["expers"]:
       exper_config.set_curr_exper_name(model_k)

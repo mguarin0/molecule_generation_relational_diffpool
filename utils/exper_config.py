@@ -9,7 +9,7 @@ from data.sparse_molecular_dataset import SparseMolecularDataset
 
 class Exper_Config:
 
-  def __init__(self, num_epochs, batch_size,
+  def __init__(self, run_type, num_epochs, batch_size,
                      learning_rate, rl_lambda,
                      optimize_for, n_samples,
                      n_critic, z_dim, log_every,
