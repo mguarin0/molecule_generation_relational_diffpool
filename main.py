@@ -35,10 +35,11 @@ parser.add_argument("--log_every",
                     default=128,
                     type=int)
 parser.add_argument("--chkpt_every",
-                    default=1024,
+                    default=2056,
+                    help="this value should be greater than validate_every",
                     type=int)
 parser.add_argument("--validate_every",
-                    default=2056,
+                    default=2056*2,
                     type=int)
 parser.add_argument("--dataset",
                     default="qm9",
