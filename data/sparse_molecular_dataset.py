@@ -320,6 +320,10 @@ class SparseMolecularDataset():
                                idx=self.validation_idx, batch_size=batch_size)
         self.validation_counter = out[0]
 
+        z = self.get_z(batch_size, z_dim)
+        results = out[1:]
+        results.append(z)
+
         return out[1:]
 
     def next_test_batch(self, batch_size=None):
@@ -329,6 +333,9 @@ class SparseMolecularDataset():
         out = self._next_batch(counter=self.test_counter, count=self.test_count,
                                idx=self.test_idx, batch_size=batch_size)
         self.test_counter = out[0]
+        z = self.get_z(batch_size, z_dim)
+        results = out[1:]
+        results.append(z)
 
         return out[1:]
 
