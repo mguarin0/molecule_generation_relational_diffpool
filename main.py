@@ -1,24 +1,12 @@
-from os.path import join, abspath, curdir, exists
 import argparse
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
-import numpy as np
-from tensorboardX import SummaryWriter
-from copy import deepcopy
 
 from utils.exper_config import Exper_Config
 from models.ops import *
 
-"""
-TODOs
-* pull in cli args DONE
-* set up filesystem DONE
-* pull in yamlexper_config file DONE
-* set up filesystem specific to experiment run DONE
-* sendexper_config object into experiment runner toexper_configure model/run the experiment
-"""
 parser = argparse.ArgumentParser()
+parser.add_argument("--run_type",
+                    default="train",
+                    type=str)
 parser.add_argument("--num_epochs",
                     default=30,
                     type=int)
@@ -69,28 +57,17 @@ if __name__ == "__main__":
 
   exper_config = Exper_Config(**vars(args))
 
-  # run all experiments
-  for model_k in exper_config.model_configs["expers"]:
-    exper_config.set_curr_exper_name(model_k)
-    exper_config.set_model_config(model_k)
+  if exper_config["run_type"] == "train":
+    # run all experiments
+    for model_k in exper_config.model_configs["expers"]:
+      exper_config.set_curr_exper_name(model_k)
+      exper_config.set_model_config(model_k)
 
-    # run all replicas for a given experiment
-    for curr_replica_num in enumerate(range(exper_config.total_replica_num)):
+      # run all replicas for a given experiment
+      for curr_replica_num in enumerate(range(exper_config.total_replica_num)):
 
-      # set up model operations for new replica
-      model_ops = Model_Ops(exper_config)
-      model_ops.train()
-      #disc_loss = nn.BCELoss().to(experiment_config["device"]) # discriminator loss
-      #aux_loss = nn.MSELoss().to(experiment_config["device"]) # aux loss
+        # set up model operations for new replica
+        model_ops = Model_Ops(exper_config)
+        model_ops.train()
 
-      exper_config.increment_replica_num()
-      # training loop for given experiment
-
-          #if (step+1) % args.log_every == 0:
-            # TODO add logging here
-          #if (step+1) % args.checkpoint_every == 0:
-            # TODO add checkpointing here
-          # TODO log/print training results for current step
-        # TODO add logging here
-        # TODO log/print validation results for validation step
-      # TODO set up model for new replica
+        exper_config.increment_replica_num()
