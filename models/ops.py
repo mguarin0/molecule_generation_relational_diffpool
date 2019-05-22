@@ -6,6 +6,9 @@ from torch.autograd import Variable
 from utils.utils import *
 from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
 import torch.nn.functional as F
+import time
+import datetime
+
 
 class Model_Ops:
     def __init__(self, exper_config):
@@ -202,10 +205,11 @@ class Model_Ops:
         if metric_type == "accuracy_score":
             return accuracy_scores
 
-    def validate(self):
+    def validate(self, step):
         self.restore_model(step)
 
         with torch.no_grad():
+            start_val_time = time.time()
             mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch((self.exper_config.data.validation_count))
             z, adj, rel_adj, x = self.process_batch(z, a, x)
 
@@ -229,6 +233,7 @@ class Model_Ops:
             log = ""
             for tag, value in m0.items():
                 log += ", {}: {:.4f}".format(tag, value)
+            log += "======== validation step time: {}".format(time.time() - start_val_time)
             self.exper_config.log_curr_exper_name_replica.write(log)
 
     def test(self, step):
@@ -236,6 +241,7 @@ class Model_Ops:
         self.restore_model(step)
 
         with torch.no_grad():
+            start_test_time = time.time()
             mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count)
             z, adj, rel_adj, x = self.process_batch(z, a, x)
             # Z-to-target
@@ -258,10 +264,13 @@ class Model_Ops:
             log = ""
             for tag, value in m0.items():
                 log += ", {}: {:.4f}".format(tag, value)
+            log += "======== test step time: {}".format(time.time() - start_test_time)
             self.exper_config.log_curr_exper_name_replica.write(log)
 
 
     def train(self):
+        start_training_time = time.time()
+
 
         # Learning rate cache for decaying.
         g_lr = self.exper_config.learning_rate
@@ -271,6 +280,7 @@ class Model_Ops:
         total_training_steps = self.exper_config.num_epochs * batches_per_epoch
         # training loop for given experiment
         for step in range(total_training_steps):
+            start_train_step_time = time.time()
             real_label_var = Variable(torch.FloatTensor(self.exper_config.batch_size) \
                                       .to(self.exper_config.device)).fill_(1)  # real labels
             fake_label_var = Variable(torch.FloatTensor(self.exper_config.batch_size) \
@@ -373,6 +383,9 @@ class Model_Ops:
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
+            log = "=========== training step time: {}".format(time.time() - start_train_step_time)
+            self.exper_config.log_curr_exper_name_replica.write(log)
+
             if step % self.exper_config.log_every == 0 and step is not 0:
                 print(step)
                 print(type(step))
@@ -439,7 +452,7 @@ class Model_Ops:
                 print('Saved model checkpoints into {}...'.format(self.model_save_dir))
 
             if step % self.exper_config.validate_every == 0:
-                print('val')
-                # self.validate()
-
-        self.test()
+                self.validate(step)
+        log = "=========== total training time: {}".format(time.time() - start_training_time)
+        self.exper_config.log_curr_exper_name_replica.write(log)
+        self.test(step)
