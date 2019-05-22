@@ -208,7 +208,7 @@ class Model_Ops:
 
         with torch.no_grad():
             start_val_time = time.time()
-            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch((self.exper_config.data.validation_count, self.exper_config.z_dim))
+            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch(self.exper_config.data.validation_count, self.exper_config.z_dim)
             z, adj, rel_adj, x = self.process_batch(z, a, x)
 
             # Z-to-target
