@@ -56,6 +56,7 @@ class Model_Ops:
             self.value.to(self.exper_config.device)
             self.print_network(self.discriminator, "discriminator")
             self.print_network(self.generator, "generator")
+            self.print_network(self.value, "value")
 
     def process_batch(self, z, a=None, x=None):
         def label2onehot(labels, dim, device):
@@ -258,7 +259,7 @@ class Model_Ops:
                 #           fake reward              #
                 # -----------------------------------#
                 # TODO don't need to call generator twice (if problem check here
-                 _, _, hx, hrel_adj = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
+                _, _, hx, hrel_adj = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
                 hx, hrel_adj = hx.argmax(-1), hrel_adj.argmax(-1)
                 mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                         for e_, n_ in zip(hrel_adj, hx)]
