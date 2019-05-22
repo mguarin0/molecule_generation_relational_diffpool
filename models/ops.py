@@ -6,7 +6,6 @@ from torch.autograd import Variable
 from utils.utils import *
 from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
 
-
 class Model_Ops:
     def __init__(self, exper_config):
 
@@ -115,13 +114,13 @@ class Model_Ops:
             elif m == 'qed':
                 rr *= MolecularMetrics.quantitative_estimation_druglikeness_scores(mols, norm=True)
             elif m == 'novelty':
-                rr *= MolecularMetrics.novel_scores(mols, data)
+                rr *= MolecularMetrics.novel_scores(mols, self.exper_config.data)
             elif m == 'dc':
-                rr *= MolecularMetrics.drugcandidate_scores(mols, data)
+                rr *= MolecularMetrics.drugcandidate_scores(mols, self.exper_config.data)
             elif m == 'unique':
                 rr *= MolecularMetrics.unique_scores(mols)
             elif m == 'diversity':
-                rr *= MolecularMetrics.diversity_scores(mols, data)
+                rr *= MolecularMetrics.diversity_scores(mols, self.exper_config.data)
             elif m == 'validity':
                 rr *= MolecularMetrics.valid_scores(mols)
             else:
