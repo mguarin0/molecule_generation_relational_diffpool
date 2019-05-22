@@ -96,11 +96,11 @@ class Model_Ops:
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from step {}...'.format(resume_iters))
-        G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+        G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                               '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+        D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                               '{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+        V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                               '{}-V.ckpt'.format(resume_iters))
         self.generator.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
@@ -233,8 +233,10 @@ class Model_Ops:
             log = ""
             for tag, value in m0.items():
                 log += ", {}: {:.4f}".format(tag, value)
+            self.exper_config.results_curr_exper_name_replica.write(log)
+            log = ""
             log += "======== validation step time: {}".format(time.time() - start_val_time)
-            self.exper_config.log_curr_exper_name_replica.write(log)
+            self.exper_config.time_curr_exper_name_replica.write(log)
 
     def test(self, step):
         # Load the trained generator.
@@ -264,8 +266,10 @@ class Model_Ops:
             log = ""
             for tag, value in m0.items():
                 log += ", {}: {:.4f}".format(tag, value)
+            self.exper_config.results_curr_exper_name_replica.write(log)
+            log = ""
             log += "======== test step time: {}".format(time.time() - start_test_time)
-            self.exper_config.log_curr_exper_name_replica.write(log)
+            self.exper_config.time_curr_exper_name_replica.write(log)
 
 
     def train(self):
@@ -278,6 +282,9 @@ class Model_Ops:
 
         batches_per_epoch = self.exper_config.data.train_count // self.exper_config.batch_size
         total_training_steps = self.exper_config.num_epochs * batches_per_epoch
+
+        self.generator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.generator_optimizer, list(range(0, total_training_steps, total_training_steps//10)))
+        self.discriminator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.discriminator_optimizer, list(range(0, total_training_steps, total_training_steps//10)))
         # training loop for given experiment
         for step in range(total_training_steps):
             start_train_step_time = time.time()
@@ -383,14 +390,11 @@ class Model_Ops:
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
+            
             log = "=========== training step time: {}".format(time.time() - start_train_step_time)
-            self.exper_config.log_curr_exper_name_replica.write(log)
+            self.exper_config.time_curr_exper_name_replica.write(log)
 
             if step % self.exper_config.log_every == 0 and step is not 0:
-                print(step)
-                print(type(step))
-                print(generator_diffpool_losses[0].to("cpu").detach().numpy())
-                print(generator_diffpool_losses[1].to("cpu").detach().numpy())
 
 #               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
 #               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
@@ -439,20 +443,24 @@ class Model_Ops:
                             int(step))
 
             # Save model checkpoints.
-            if (step + 1) % self.exper_config.chkpt_every == 0:
-                G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+            if (step + 1) % self.exper_config.chkpt_every == 0 and step is not 0:
+                G_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                                       '{}-G.ckpt'.format(step + 1))
-                D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+                D_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                                       '{}-D.ckpt'.format(step + 1))
-                V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.curr_exper_name_replica,
+                V_path = os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica,
                                       '{}-V.ckpt'.format(step + 1))
                 torch.save(self.generator.state_dict(), G_path)
                 torch.save(self.discriminator.state_dict(), D_path)
                 torch.save(self.value.state_dict(), V_path)
                 print('Saved model checkpoints into {}...'.format(self.model_save_dir))
 
-            if step % self.exper_config.validate_every == 0:
+            if step % self.exper_config.validate_every == 0 and step is not 0:
                 self.validate(step)
-        log = "=========== total training time: {}".format(time.time() - start_training_time)
-        self.exper_config.log_curr_exper_name_replica.write(log)
+
+            self.generator_lr_scheduler.step()
+            self.discriminator_lr_scheduler.step()
+
+            log = "=========== total training time: {}".format(time.time() - start_training_time)
+        self.exper_config.time_curr_exper_name_replica.write(log)
         self.test(step)
