@@ -40,6 +40,7 @@ class Exper_Config:
     self.seeds = self.model_configs["seeds"]
     self.total_replica_num = len(self.seeds)
     self._set_seeds()
+    self.log_curr_exper_name_replica = self._get_resultsFile()
 
   def _set_seeds(self):
     # set torch and numpy seeds
@@ -105,3 +106,6 @@ class Exper_Config:
 
   def _get_SummaryWriter(self):
     return SummaryWriter(self.paths["EXPER_SUMMAIRES_DIR"])
+
+  def _get_resultsFile(self):
+    return open(join(self.paths["EXPER_LOG_DIR"], self.curr_exper_name_replica), "w")

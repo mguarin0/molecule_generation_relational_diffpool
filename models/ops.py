@@ -101,8 +101,22 @@ class Model_Ops:
                               '{}-V.ckpt'.format(resume_iters))
         self.generator.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
-        self.V.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
+        self.value.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
 
+    def all_scores(self, mols, data, norm=False, reconstruction=False):
+        m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
+            'NP score': MolecularMetrics.natural_product_scores(mols, norm=norm),
+            'QED score': MolecularMetrics.quantitative_estimation_druglikeness_scores(mols),
+            'logP score': MolecularMetrics.water_octanol_partition_coefficient_scores(mols, norm=norm),
+            'SA score': MolecularMetrics.synthetic_accessibility_score_scores(mols, norm=norm),
+            'diversity score': MolecularMetrics.diversity_scores(mols, data),
+            'drugcandidate score': MolecularMetrics.drugcandidate_scores(mols, data)}.items()}
+
+        m1 = {'valid score': MolecularMetrics.valid_total_score(mols) * 100,
+              'unique score': MolecularMetrics.unique_total_score(mols) * 100,
+              'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
+
+        return m0, m1
     def reward(self, mols):
         rr = 1.
         for m in ('logp,sas,qed,unique' if self.metric == 'all' else self.metric).split(','):
@@ -189,21 +203,63 @@ class Model_Ops:
             return accuracy_scores
 
     def validate(self):
-        # validate mode
-        self.discriminator.eval()
-        self.generator.eval()
+        self.restore_model(step)
 
-        mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch(
-            self.exper_config.data.validation_count)
-        z, adj, rel_adj, x = self.process_batch(z, a, x)
+        with torch.no_grad():
+            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch((self.exper_config.data.validation_count))
+            z, adj, rel_adj, x = self.process_batch(z, a, x)
 
-    def test(self):
-        # test mode
-        self.discriminator.eval()
-        self.generator.eval()
+            # Z-to-target
+            edges_logits, nodes_logits = self.generator(z)
+            # Postprocess with Gumbel softmax
+            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits))
+            logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
+            fake_generator_loss_test = - torch.mean(logits_fake)
 
-        mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count)
-        z, adj, rel_adj, x = self.process_batch(z, a, x)
+            # Fake Reward
+            _, _, nodes_hard, edges_hard = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
+            edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
+            mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
+                    for e_, n_ in zip(edges_hard, nodes_hard)]
+
+            # Log update
+            m0, m1 = self.all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+            m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
+            m0.update(m1)
+            log = ""
+            for tag, value in m0.items():
+                log += ", {}: {:.4f}".format(tag, value)
+            self.exper_config.log_curr_exper_name_replica.write(log)
+
+    def test(self, step):
+        # Load the trained generator.
+        self.restore_model(step)
+
+        with torch.no_grad():
+            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count)
+            z, adj, rel_adj, x = self.process_batch(z, a, x)
+            # Z-to-target
+            edges_logits, nodes_logits = self.generator(z)
+            # Postprocess with Gumbel softmax
+            (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits))
+            logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
+            fake_generator_loss_test = - torch.mean(logits_fake)
+
+            # Fake Reward
+            _, _, nodes_hard, edges_hard = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
+            edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
+            mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
+                    for e_, n_ in zip(edges_hard, nodes_hard)]
+
+            # Log update
+            m0, m1 = self.all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+            m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
+            m0.update(m1)
+            log = ""
+            for tag, value in m0.items():
+                log += ", {}: {:.4f}".format(tag, value)
+            self.exper_config.log_curr_exper_name_replica.write(log)
+
 
     def train(self):
 
@@ -386,4 +442,4 @@ class Model_Ops:
                 print('val')
                 # self.validate()
 
-        # self.test()
+        self.test()
