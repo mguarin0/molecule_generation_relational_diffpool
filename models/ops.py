@@ -94,9 +94,9 @@ class Model_Ops:
         """Print out the network information."""
         num_params = 0
         for n, p in model.named_parameters():
-            print(n, p)
+            print(n, p.size())
             num_params += p.numel()
-            self.exper_config.model_params_curr_exper_name_replica.write("{} {}".format(n, p))
+            self.exper_config.model_params_curr_exper_name_replica.write("{} {}".format(n, p.size()))
         print(name)
         print("The number of parameters: {}".format(num_params))
 
@@ -189,7 +189,7 @@ class Model_Ops:
                 if v > 0.9:
                     molfilename = len(os.listdir(self.exper_config.paths["EXPER_VALMOLs_DIR"]))+1
                     pickle.dump(mol, os.path.join(self.exper_config.paths["EXPER_VALMOLs_DIR"],
-                                                  molfilename+".p"))
+                                                  "{}.p".format(".p")))
 
             # put
             return valid, unique, novel, diverse, drugcandidate_score
