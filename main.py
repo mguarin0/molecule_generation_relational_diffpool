@@ -23,7 +23,7 @@ parser.add_argument("--rl_lambda",
                     default=0.0,
                     type=float)
 parser.add_argument("--optimize_for",
-                    default="validity,sas",
+                    default="validity,dc",
                     type=str)
 parser.add_argument("--n_samples",
                     default=6400,
@@ -35,10 +35,10 @@ parser.add_argument("--z_dim",
                     default=32,
                     type=int)
 parser.add_argument("--log_every",
-                    default=12,
+                    default=256,
                     type=int)
 parser.add_argument("--val_chkpt_every",
-                    default=10,
+                    default=2048,
                     help="this value should be greater than validate_every",
                     type=int)
 parser.add_argument("--dataset",

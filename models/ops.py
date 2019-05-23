@@ -96,9 +96,7 @@ class Model_Ops:
         for n, p in model.named_parameters():
             print(n, p)
             num_params += p.numel()
-
-        self.exper_config.model_params_curr_exper_name_replica.write(model.named_parameters() + "\n")
-        print(model)
+            self.exper_config.model_params_curr_exper_name_replica.write("{} {}".format(n, p))
         print(name)
         print("The number of parameters: {}".format(num_params))
 
@@ -248,7 +246,7 @@ class Model_Ops:
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "val"})
-            self.exper_config.results_curr_exper_name_replica.writerow(**m0)
+            self.exper_config.results_curr_exper_name_replica.writerow(m0)
             self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "val", "time": (time.time() - start_val_time)})
 
@@ -280,7 +278,7 @@ class Model_Ops:
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "test"})
-            self.exper_config.results_curr_exper_name_replica.writerow(**m0)
+            self.exper_config.results_curr_exper_name_replica.writerow(m0)
             self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "test", "time": (time.time() - start_test_time)})
 
@@ -476,7 +474,7 @@ class Model_Ops:
                             step)
 
             # Save model checkpoints.
-            if step % self.exper_config.chkpt_every == 0 and step is not 0:
+            if step % self.exper_config.val_chkpt_every == 0 and step is not 0:
                 G_path = os.path.join(self.val_chkpt_path, '{}-G.ckpt'.format(step))
                 D_path = os.path.join(self.val_chkpt_path, '{}-D.ckpt'.format(step))
                 V_path = os.path.join(self.val_chkpt_path, '{}-V.ckpt'.format(step))
