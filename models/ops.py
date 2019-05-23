@@ -8,6 +8,8 @@ from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_sco
 import torch.nn.functional as F
 import time
 import datetime
+import pickle
+from rdkit.Chem import AllChem as Chem
 
 
 class Model_Ops:
@@ -177,6 +179,14 @@ class Model_Ops:
             novel = MolecularMetrics.novel_scores(mols, self.exper_config.data)
             diverse = MolecularMetrics.diversity_scores(mols, self.exper_config.data)
             drugcandidate_score = MolecularMetrics.drugcandidate_scores(mols, self.exper_config.data)
+#           for v, mol in zip(valid, mols):
+#               if v>0.9:
+#                   for m in mol:
+#                       tmp=Chem.Compute2DCoords(m)
+#                       Draw.MolToFile(ms[0],'images/cdk2_mol1.o.png')
+#                       https://www.rdkit.org/docs/GettingStartedInPython.html
+
+             # put
             return valid, unique, novel, diverse, drugcandidate_score
 
         if metric_type == "chem_metrics":
@@ -429,28 +439,28 @@ class Model_Ops:
                      "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to("cpu").detach().numpy(),
                      "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
                      "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to("cpu").detach().numpy()},
-                    int(step))
+                      step)
                 for name, param in self.discriminator.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
                             "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
                                                  name),
                             param,
-                            int(step))
+                            step)
                 for name, param in self.generator.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
                             "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
                                                  name),
                             param,
-                            int(step))
+                            step)
                 for name, param in self.value.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
                             "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
                                                  name),
                             param,
-                            int(step))
+                            step)
 
             # Save model checkpoints.
             if (step + 1) % self.exper_config.chkpt_every == 0 and step is not 0:
@@ -463,12 +473,12 @@ class Model_Ops:
                 torch.save(self.value.state_dict(), V_path)
                 print('Saved model checkpoints into {}...'.format(self.chkpt_path))
 
-            if step % self.exper_config.validate_every == 0 and step is not 0:
-                self.validate(step)
+#           if step % self.exper_config.validate_every == 0 and step is not 0:
+#               self.validate(step)
 
             self.generator_lr_scheduler.step()
             self.discriminator_lr_scheduler.step()
 
             log = "=========== total training time: {}".format(time.time() - start_training_time)
         self.exper_config.time_curr_exper_name_replica.write(log)
-        self.test(step)
+#       self.test(step)

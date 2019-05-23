@@ -4,6 +4,9 @@ from utils.exper_config import Exper_Config
 from models.ops import *
 
 parser = argparse.ArgumentParser()
+parser.add_argument("model_config_file",
+                    type=str,
+                    help="yaml file for model config")
 parser.add_argument("--run_type",
                     default="train",
                     type=str)
@@ -47,11 +50,6 @@ parser.add_argument("--dataset",
 parser.add_argument("--use_cuda",
                     default=True,
                     type=bool)
-parser.add_argument("--model_config_file",
-                    type=str,
-                    default="config_1.yml",
-                    choices=["config_1.yml"],
-                    help="yaml file for model config")
 args = parser.parse_args()
 
 if __name__ == "__main__":
