@@ -189,7 +189,7 @@ class Model_Ops:
                 if v > 0.9:
                     molfilename = len(os.listdir(self.exper_config.paths["EXPER_VALMOLs_DIR"]))+1
                     pickle.dump(mol, open(os.path.join(self.exper_config.paths["EXPER_VALMOLs_DIR"],
-                                                  "{}.p".format(".p")), "wb")
+                                                  "{}.p".format(".p")), "wb"))
 
             # put
             return valid, unique, novel, diverse, drugcandidate_score
