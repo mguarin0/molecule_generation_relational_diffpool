@@ -35,14 +35,11 @@ parser.add_argument("--z_dim",
                     default=32,
                     type=int)
 parser.add_argument("--log_every",
-                    default=128,
+                    default=12,
                     type=int)
-parser.add_argument("--chkpt_every",
-                    default=2056,
+parser.add_argument("--val_chkpt_every",
+                    default=10,
                     help="this value should be greater than validate_every",
-                    type=int)
-parser.add_argument("--validate_every",
-                    default=2056*2,
                     type=int)
 parser.add_argument("--dataset",
                     default="qm9",
