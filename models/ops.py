@@ -245,8 +245,8 @@ class Model_Ops:
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "val"})
-            self.exper_config.results_curr_exper_name_replica.writer.writerow(**m0)
-            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+            self.exper_config.results_curr_exper_name_replica.writerow(**m0)
+            self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "val", "time": (time.time() - start_val_time)})
 
     def test(self, step):
@@ -277,8 +277,8 @@ class Model_Ops:
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "test"})
-            self.exper_config.results_curr_exper_name_replica.writer.writerow(**m0)
-            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+            self.exper_config.results_curr_exper_name_replica.writerow(**m0)
+            self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "test", "time": (time.time() - start_test_time)})
 
     def train(self):
@@ -403,7 +403,7 @@ class Model_Ops:
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
-            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+            self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "train", "time": (time.time() - start_train_step_time)})
 
             if step % self.exper_config.log_every == 0 and step is not 0:
@@ -489,6 +489,6 @@ class Model_Ops:
             self.generator_lr_scheduler.step()
             self.discriminator_lr_scheduler.step()
 
-        self.exper_config.time_curr_exper_name_replica.writer.writerow(
+        self.exper_config.time_curr_exper_name_replica.writerow(
             {"step": step, "run_type": "full_train", "time": (time.time() - start_full_training_time)})
         self.test(step)

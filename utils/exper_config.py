@@ -103,11 +103,11 @@ class Exper_Config:
                                               curr_exper_name)
         self.curr_exper_name_replica = "{}/{}".format(self.replica_num,
                                                       self.curr_exper_name)
-        self.results_curr_exper_name_replica = self._get_resultsFile("csv", "results",
+        self.results_curr_exper_name_replica = self._get_resultsFile("results", "csv",
                                                                      ['step', 'run_type','NP score', 'QED score', 'logP score', 'SA score',
                                                                       'diversity score', 'drugcandidate score',
                                                                       'valid score', 'unique score', 'novel score'])
-        self.time_curr_exper_name_replica = self._get_resultsFile("csv", "times", ["step", "run_type", "time"])
+        self.time_curr_exper_name_replica = self._get_resultsFile("times", "csv",["step", "run_type", "time"])
         self.results_curr_exper_name_replica.writeheader()
         self.time_curr_exper_name_replica.writeheader()
 
