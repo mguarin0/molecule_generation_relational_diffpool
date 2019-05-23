@@ -93,8 +93,11 @@ class Model_Ops:
     def print_network(self, model, name):
         """Print out the network information."""
         num_params = 0
-        for p in model.parameters():
+        for n, p in model.named_parameters():
+            print(n, p)
             num_params += p.numel()
+
+        self.exper_config.model_params_curr_exper_name_replica.write(model.named_parameters() + "\n")
         print(model)
         print(name)
         print("The number of parameters: {}".format(num_params))
@@ -229,19 +232,19 @@ class Model_Ops:
             # Z-to-target
             # Postprocess with Gumbel softmax
             nodes_hat, edges_hat = self.generator(z)
-            logits_fake, features_fake = self.discriminator(
-                (nodes_hat, edges_hat.float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
+            logits_fake, features_fake, _ = self.discriminator(
+                (nodes_hat, edges_hat.argmax(-1).float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
             # Fake Reward
             _, _, nodes_hard, edges_hard = self.generator((z),
                                                           catsamp="hard_gumbel")  # descritize input to discriminator
             edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
-            mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
+            mols = [self.exper_config.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                     for e_, n_ in zip(edges_hard, nodes_hard)]
 
             # Log update
-            m0, m1 = self.all_scores(mols, self.data, norm=True)  # 'mols' is output of Fake Reward
+            m0, m1 = self.all_scores(mols, self.exper_config.data, norm=True)  # 'mols' is output of Fake Reward
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "val"})
@@ -261,19 +264,19 @@ class Model_Ops:
             # Z-to-target
             # Postprocess with Gumbel softmax
             nodes_hat, edges_hat = self.generator(z)
-            logits_fake, features_fake = self.discriminator(
-                (nodes_hat, edges_hat.float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
+            logits_fake, features_fake, _ = self.discriminator(
+                (nodes_hat, edges_hat.argmax(-1).float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
             # Fake Reward
             _, _, nodes_hard, edges_hard = self.generator((z),
                                                           catsamp="hard_gumbel")  # descritize input to discriminator
             edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
-            mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
+            mols = [self.exper_config.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                     for e_, n_ in zip(edges_hard, nodes_hard)]
 
             # Log update
-            m0, m1 = self.all_scores(mols, self.data, norm=True)  # 'mols' is output of Fake Reward
+            m0, m1 = self.all_scores(mols, self.exper_config.data, norm=True)  # 'mols' is output of Fake Reward
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             m0.update({"step": step, "run_type": "test"})

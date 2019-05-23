@@ -108,6 +108,7 @@ class Exper_Config:
                                                                       'diversity score', 'drugcandidate score',
                                                                       'valid score', 'unique score', 'novel score'])
         self.time_curr_exper_name_replica = self._get_resultsFile("times", "csv",["step", "run_type", "time"])
+        self.model_params_curr_exper_name_replica = self._get_resultsFile("model_params", "txt")
         self.results_curr_exper_name_replica.writeheader()
         self.time_curr_exper_name_replica.writeheader()
 
