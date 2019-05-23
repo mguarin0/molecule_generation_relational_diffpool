@@ -16,7 +16,7 @@ class Exper_Config:
                  learning_rate, rl_lambda,
                  optimize_for, n_samples,
                  n_critic, z_dim, log_every,
-                 chkpt_every, validate_every, dataset,
+                 val_chkpt_every, dataset,
                  use_cuda, model_config_file):
         self.num_epochs = num_epochs
         self.batch_size = batch_size
@@ -28,8 +28,7 @@ class Exper_Config:
         self.n_critic = n_critic
         self.num_classes = 1
         self.log_every = log_every
-        self.chkpt_every = chkpt_every
-        self.validate_every = validate_every
+        self.val_chkpt_every = val_chkpt_every
         self.dataset = dataset
         self.use_cuda = use_cuda
         self.num_vertices = 9
