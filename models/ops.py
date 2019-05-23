@@ -12,6 +12,9 @@ import pickle
 from rdkit.Chem import AllChem as Chem
 
 
+# from anycache import anycache # use this someday!
+
+
 class Model_Ops:
     def __init__(self, exper_config):
 
@@ -26,7 +29,8 @@ class Model_Ops:
         self.generator_beta_2 = self.exper_config.model_config["gen"]["optimizer"][2]
         self.discriminator_beta_1 = self.exper_config.model_config["dscr"]["optimizer"][1]
         self.discriminator_beta_2 = self.exper_config.model_config["dscr"]["optimizer"][2]
-        self.chkpt_path = self.exper_config.set_chkpt_path(os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica))
+        self.chkpt_path = self.exper_config.set_chkpt_path(
+            os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica))
         self._model_builder()
 
     def _model_builder(self):
@@ -100,8 +104,8 @@ class Model_Ops:
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from step {}...'.format(resume_iters))
         G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.chkpt_path,'{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.chkpt_path,'{}-V.ckpt'.format(resume_iters))
+        D_path = os.path.join(self.chkpt_path, '{}-D.ckpt'.format(resume_iters))
+        V_path = os.path.join(self.chkpt_path, '{}-V.ckpt'.format(resume_iters))
         self.generator.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.value.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
@@ -120,6 +124,7 @@ class Model_Ops:
               'novel score': MolecularMetrics.novel_total_score(mols, data) * 100}
 
         return m0, m1
+
     def reward(self, mols):
         rr = 1.
         for m in ('logp,sas,qed,unique' if self.metric == 'all' else self.metric).split(','):
@@ -179,14 +184,13 @@ class Model_Ops:
             novel = MolecularMetrics.novel_scores(mols, self.exper_config.data)
             diverse = MolecularMetrics.diversity_scores(mols, self.exper_config.data)
             drugcandidate_score = MolecularMetrics.drugcandidate_scores(mols, self.exper_config.data)
-#           for v, mol in zip(valid, mols):
-#               if v>0.9:
-#                   for m in mol:
-#                       tmp=Chem.Compute2DCoords(m)
-#                       Draw.MolToFile(ms[0],'images/cdk2_mol1.o.png')
-#                       https://www.rdkit.org/docs/GettingStartedInPython.html
+            for v, mol in zip(valid, mols):
+                if v > 0.9:
+                    molfilename = len(os.listdir(self.exper_config.paths["EXPER_VALMOLs_DIR"]))+1
+                    pickle.dump(mol, os.path.join(self.exper_config.paths["EXPER_VALMOLs_DIR"],
+                                                  molfilename+".p"))
 
-             # put
+            # put
             return valid, unique, novel, diverse, drugcandidate_score
 
         if metric_type == "chem_metrics":
@@ -218,32 +222,32 @@ class Model_Ops:
 
         with torch.no_grad():
             start_val_time = time.time()
-            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch(self.exper_config.data.validation_count, self.exper_config.z_dim)
+            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_validation_batch(
+                self.exper_config.data.validation_count, self.exper_config.z_dim)
             z, adj, rel_adj, x = self.process_batch(z, a, x)
 
             # Z-to-target
             # Postprocess with Gumbel softmax
-            nodes_hat, edges_hat  = self.generator(z)
-            logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
+            nodes_hat, edges_hat = self.generator(z)
+            logits_fake, features_fake = self.discriminator(
+                (nodes_hat, edges_hat.float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
             # Fake Reward
-            _, _, nodes_hard, edges_hard = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
+            _, _, nodes_hard, edges_hard = self.generator((z),
+                                                          catsamp="hard_gumbel")  # descritize input to discriminator
             edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
             mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                     for e_, n_ in zip(edges_hard, nodes_hard)]
 
             # Log update
-            m0, m1 = self.all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+            m0, m1 = self.all_scores(mols, self.data, norm=True)  # 'mols' is output of Fake Reward
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
-            log = ""
-            for tag, value in m0.items():
-                log += ", {}: {:.4f}".format(tag, value)
-            self.exper_config.results_curr_exper_name_replica.write(log)
-            log = ""
-            log += "======== validation step time: {}".format(time.time() - start_val_time)
-            self.exper_config.time_curr_exper_name_replica.write(log)
+            m0.update({"step": step, "run_type": "val"})
+            self.exper_config.results_curr_exper_name_replica.writer.writerow(**m0)
+            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+                {"step": step, "run_type": "val", "time": (time.time() - start_val_time)})
 
     def test(self, step):
         # Load the trained generator.
@@ -251,36 +255,34 @@ class Model_Ops:
 
         with torch.no_grad():
             start_test_time = time.time()
-            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count, self.exper_config.z_dim)
+            mols, _, _, a, x, _, _, _, _, z = self.exper_config.data.next_test_batch(self.exper_config.data.test_count,
+                                                                                     self.exper_config.z_dim)
             z, adj, rel_adj, x = self.process_batch(z, a, x)
             # Z-to-target
             # Postprocess with Gumbel softmax
-            nodes_hat, edges_hat  = self.generator(z)
-            logits_fake, features_fake = self.discriminator((nodes_hat, edges_hat.float(), edges_hat[:,:,:,1:].permute(0,3,1,2)))
+            nodes_hat, edges_hat = self.generator(z)
+            logits_fake, features_fake = self.discriminator(
+                (nodes_hat, edges_hat.float(), edges_hat[:, :, :, 1:].permute(0, 3, 1, 2)))
             fake_generator_loss_test = - torch.mean(logits_fake)
 
             # Fake Reward
-            _, _, nodes_hard, edges_hard = self.generator((z), catsamp="hard_gumbel")  # descritize input to discriminator
+            _, _, nodes_hard, edges_hard = self.generator((z),
+                                                          catsamp="hard_gumbel")  # descritize input to discriminator
             edges_hard, nodes_hard = torch.max(edges_hard, -1)[1], torch.max(nodes_hard, -1)[1]
             mols = [self.data.matrices2mol(n_.data.cpu().numpy(), e_.data.cpu().numpy(), strict=True)
                     for e_, n_ in zip(edges_hard, nodes_hard)]
 
             # Log update
-            m0, m1 = self.all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+            m0, m1 = self.all_scores(mols, self.data, norm=True)  # 'mols' is output of Fake Reward
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
-            log = ""
-            for tag, value in m0.items():
-                log += ", {}: {:.4f}".format(tag, value)
-            self.exper_config.results_curr_exper_name_replica.write(log)
-            log = ""
-            log += "======== test step time: {}".format(time.time() - start_test_time)
-            self.exper_config.time_curr_exper_name_replica.write(log)
-
+            m0.update({"step": step, "run_type": "test"})
+            self.exper_config.results_curr_exper_name_replica.writer.writerow(**m0)
+            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+                {"step": step, "run_type": "test", "time": (time.time() - start_test_time)})
 
     def train(self):
-        start_training_time = time.time()
-
+        start_full_training_time = time.time()
 
         # Learning rate cache for decaying.
         g_lr = self.exper_config.learning_rate
@@ -289,8 +291,10 @@ class Model_Ops:
         batches_per_epoch = self.exper_config.data.train_count // self.exper_config.batch_size
         total_training_steps = self.exper_config.num_epochs * batches_per_epoch
 
-        self.generator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.generator_optimizer, list(range(0, total_training_steps, total_training_steps//10)))
-        self.discriminator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.discriminator_optimizer, list(range(0, total_training_steps, total_training_steps//10)))
+        self.generator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.generator_optimizer, list(
+            range(0, total_training_steps, total_training_steps // 10)))
+        self.discriminator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.discriminator_optimizer, list(
+            range(0, total_training_steps, total_training_steps // 10)))
         # training loop for given experiment
         for step in range(total_training_steps):
             start_train_step_time = time.time()
@@ -316,7 +320,7 @@ class Model_Ops:
                     (hx,
                      hrel_adj.argmax(
                          -1).float(),
-                     hrel_adj[:,:,:,1:] \
+                     hrel_adj[:, :, :, 1:] \
                      .permute(
                          0,
                          3,
@@ -343,8 +347,10 @@ class Model_Ops:
                 fake_reward = torch.from_numpy(self.reward(mols)).to(self.exper_config.device)
 
                 # Value loss
-                real_value_logit, _, real_value_diff_pool_losses = self.value((x, adj.float(), rel_adj[:,:,:,1:].permute(0,3,1,2)))
-                fake_value_logit, _, real_value_diff_pool_losses = self.value((hx, hrel_adj.argmax(-1).float(), hrel_adj[:,:,:,1:].permute(0,3,1,2)))
+                real_value_logit, _, real_value_diff_pool_losses = self.value(
+                    (x, adj.float(), rel_adj[:, :, :, 1:].permute(0, 3, 1, 2)))
+                fake_value_logit, _, real_value_diff_pool_losses = self.value(
+                    (hx, hrel_adj.argmax(-1).float(), hrel_adj[:, :, :, 1:].permute(0, 3, 1, 2)))
                 generator_loss_value = torch.mean((F.sigmoid(real_value_logit) - real_reward) ** 2 + (
                         F.sigmoid(fake_value_logit) - fake_reward) ** 2)
 
@@ -385,7 +391,8 @@ class Model_Ops:
                 eps = torch.rand(real_discriminator_logits.size(0), 1, 1, 1).to(self.exper_config.device)
                 x_int0 = (eps * rel_adj + (1. - eps) * hrel_adj).requires_grad_(True)
                 x_int1 = (eps.squeeze(-1) * x + (1. - eps.squeeze(-1)) * hx).requires_grad_(True)
-                grad0, grad1, _ = self.discriminator((x_int1, x_int0.argmax(-1).float(), x_int0[:,:,:,1:].permute(0, 3, 1, 2)))
+                grad0, grad1, _ = self.discriminator(
+                    (x_int1, x_int0.argmax(-1).float(), x_int0[:, :, :, 1:].permute(0, 3, 1, 2)))
                 discriminator_loss_w_gp = self.gradient_penalty(grad0, x_int0) + self.gradient_penalty(grad1, x_int1)
 
                 # train dscr real and fake losses
@@ -396,15 +403,14 @@ class Model_Ops:
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
-            
-            log = "=========== training step time: {}".format(time.time() - start_train_step_time)
-            self.exper_config.time_curr_exper_name_replica.write(log)
+            self.exper_config.time_curr_exper_name_replica.writer.writerow(
+                {"step": step, "run_type": "train", "time": (time.time() - start_train_step_time)})
 
             if step % self.exper_config.log_every == 0 and step is not 0:
 
-#               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
-#               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
-#               generator_accuracy = self.accuracy_scores_(fake_label_var, generator_train_discriminator_preds)
+                #               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
+                #               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
+                #               generator_accuracy = self.accuracy_scores_(fake_label_var, generator_train_discriminator_preds)
 
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/chem_metrics".format(self.exper_config.curr_exper_name_replica),
@@ -414,12 +420,12 @@ class Model_Ops:
                      "generator_diverse": np.mean(generator_diverse),
                      "generator_drug_candidate_score": np.mean(generator_drug_candidate_score)},
                     int(step))
-#               self.exper_config.summary_writer.add_scalars(
-#                   "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
-#                   {"fake_discriminator_accuracy": fake_discriminator_accuracy,
-#                    "real_discriminator_accuracy": real_discriminator_accuracy,
-#                    "generator_accuracy": generator_accuracy},
-#                   step)
+                #               self.exper_config.summary_writer.add_scalars(
+                #                   "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
+                #                   {"fake_discriminator_accuracy": fake_discriminator_accuracy,
+                #                    "real_discriminator_accuracy": real_discriminator_accuracy,
+                #                    "generator_accuracy": generator_accuracy},
+                #                   step)
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/generator_losses".format(self.exper_config.curr_exper_name_replica),
                     {"fake_generator_loss": np.mean(fake_generator_loss.to("cpu").detach().numpy()),
@@ -435,11 +441,15 @@ class Model_Ops:
                     {"real_discriminator_loss": real_discriminator_loss.to("cpu").detach().numpy(),
                      "fake_discriminator_loss": fake_discriminator_loss.to("cpu").detach().numpy(),
                      "discriminator_loss_w_gp": discriminator_loss_w_gp.to("cpu").detach().numpy(),
-                     "real_discriminator_diffpool_losses[0]": real_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
-                     "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to("cpu").detach().numpy(),
-                     "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
-                     "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to("cpu").detach().numpy()},
-                      step)
+                     "real_discriminator_diffpool_losses[0]": real_discriminator_diffpool_losses[0].to(
+                         "cpu").detach().numpy(),
+                     "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to(
+                         "cpu").detach().numpy(),
+                     "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to(
+                         "cpu").detach().numpy(),
+                     "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to(
+                         "cpu").detach().numpy()},
+                    step)
                 for name, param in self.discriminator.named_parameters():
                     if param.requires_grad == True:
                         self.exper_config.summary_writer.add_histogram(
@@ -464,21 +474,21 @@ class Model_Ops:
 
             # Save model checkpoints.
             if (step + 1) % self.exper_config.chkpt_every == 0 and step is not 0:
-                G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(step+1))
-                D_path = os.path.join(self.chkpt_path,'{}-D.ckpt'.format(step+1))
-                V_path = os.path.join(self.chkpt_path,'{}-V.ckpt'.format(step+1))
+                G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(step + 1))
+                D_path = os.path.join(self.chkpt_path, '{}-D.ckpt'.format(step + 1))
+                V_path = os.path.join(self.chkpt_path, '{}-V.ckpt'.format(step + 1))
 
                 torch.save(self.generator.state_dict(), G_path)
                 torch.save(self.discriminator.state_dict(), D_path)
                 torch.save(self.value.state_dict(), V_path)
                 print('Saved model checkpoints into {}...'.format(self.chkpt_path))
 
-#           if step % self.exper_config.validate_every == 0 and step is not 0:
-#               self.validate(step)
+            if step % self.exper_config.validate_every == 0 and step is not 0:
+                self.validate(step)
 
             self.generator_lr_scheduler.step()
             self.discriminator_lr_scheduler.step()
 
-            log = "=========== total training time: {}".format(time.time() - start_training_time)
-        self.exper_config.time_curr_exper_name_replica.write(log)
-#       self.test(step)
+        self.exper_config.time_curr_exper_name_replica.writer.writerow(
+            {"step": step, "run_type": "full_train", "time": (time.time() - start_full_training_time)})
+        self.test(step)
