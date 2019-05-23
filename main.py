@@ -10,6 +10,12 @@ parser.add_argument("model_config_file",
 parser.add_argument("--run_type",
                     default="train",
                     type=str)
+parser.add_argument("--resume",
+                    default=False,
+                    type=bool)
+parser.add_argument("--resume_step",
+                    default=0,
+                    type=int)
 parser.add_argument("--num_epochs",
                     default=30,
                     type=int)
@@ -64,6 +70,10 @@ if __name__ == "__main__":
 
         # set up model operations for new replica
         model_ops = Model_Ops(exper_config)
-        model_ops.train()
+        if args.resume:
+          model_ops.train(True, args.resume_step)
+        else:
+
+          model_ops.train(True, args.resume_step)
 
         exper_config.increment_replica_num()

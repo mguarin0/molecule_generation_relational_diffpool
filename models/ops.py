@@ -282,7 +282,7 @@ class Model_Ops:
             self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "test", "time": (time.time() - start_test_time)})
 
-    def train(self):
+    def train(self, resume=False, resume_step=0):
         start_full_training_time = time.time()
 
         # Learning rate cache for decaying.
@@ -297,7 +297,9 @@ class Model_Ops:
         self.discriminator_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.discriminator_optimizer, list(
             range(0, total_training_steps, total_training_steps // 10)))
         # training loop for given experiment
-        for step in range(total_training_steps):
+        if resume:
+            self.restore_model(resume_step)
+        for step in range(resume_step, total_training_steps):
             start_train_step_time = time.time()
             real_label_var = Variable(torch.FloatTensor(self.exper_config.batch_size) \
                                       .to(self.exper_config.device)).fill_(1)  # real labels
@@ -310,7 +312,7 @@ class Model_Ops:
             # ----------------------------------------------------------#
             #                     train generator                       #
             # ----------------------------------------------------------#
-            if step % self.exper_config.n_critic == 0 and step is not 0:
+            if step % self.exper_config.n_critic == 0 and step is not resume_step:
                 # gen training mode
                 # -----------------------------------#
                 #           train with fake          #
@@ -407,7 +409,7 @@ class Model_Ops:
             self.exper_config.time_curr_exper_name_replica.writerow(
                 {"step": step, "run_type": "train", "time": (time.time() - start_train_step_time)})
 
-            if step % self.exper_config.log_every == 0 and step is not 0:
+            if step % self.exper_config.log_every == 0 and step is not resume_step and step > resume_step+1+self.exper_config.n_critic:
 
                 #               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
                 #               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
@@ -453,28 +455,16 @@ class Model_Ops:
                     step)
                 for name, param in self.discriminator.named_parameters():
                     if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram(
-                            "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
-                                                 name),
-                            param,
-                            step)
+                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
                 for name, param in self.generator.named_parameters():
                     if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram(
-                            "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
-                                                 name),
-                            param,
-                            step)
+                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
                 for name, param in self.value.named_parameters():
                     if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram(
-                            "{}/train/{}".format(self.exper_config.curr_exper_name_replica,
-                                                 name),
-                            param,
-                            step)
+                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
 
             # Save model checkpoints.
-            if step % self.exper_config.val_chkpt_every == 0 and step is not 0:
+            if step % self.exper_config.val_chkpt_every == 0 and step is not resume_step:
                 G_path = os.path.join(self.val_chkpt_path, '{}-G.ckpt'.format(step))
                 D_path = os.path.join(self.val_chkpt_path, '{}-D.ckpt'.format(step))
                 V_path = os.path.join(self.val_chkpt_path, '{}-V.ckpt'.format(step))
