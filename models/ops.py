@@ -29,7 +29,7 @@ class Model_Ops:
         self.generator_beta_2 = self.exper_config.model_config["gen"]["optimizer"][2]
         self.discriminator_beta_1 = self.exper_config.model_config["dscr"]["optimizer"][1]
         self.discriminator_beta_2 = self.exper_config.model_config["dscr"]["optimizer"][2]
-        self.val_chkpt_path = self.exper_config.set_chkpt_path(
+        self.chkpt_path = self.exper_config.set_chkpt_path(
             os.path.join(self.exper_config.paths["EXPER_CHKPTS_DIR"], self.exper_config.curr_exper_name_replica))
         self._model_builder()
 
@@ -104,12 +104,25 @@ class Model_Ops:
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
         print('Loading the trained models from step {}...'.format(resume_iters))
-        G_path = os.path.join(self.val_chkpt_path, '{}-G.ckpt'.format(resume_iters))
-        D_path = os.path.join(self.val_chkpt_path, '{}-D.ckpt'.format(resume_iters))
-        V_path = os.path.join(self.val_chkpt_path, '{}-V.ckpt'.format(resume_iters))
+        G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(resume_iters))
+        D_path = os.path.join(self.chkpt_path, '{}-D.ckpt'.format(resume_iters))
+        V_path = os.path.join(self.chkpt_path, '{}-V.ckpt'.format(resume_iters))
         self.generator.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.value.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
+
+    def chkpt_model(self, save_step):
+        G_path = os.path.join(self.chkpt_path, '{}-G.ckpt'.format(step))
+        D_path = os.path.join(self.chkpt_path, '{}-D.ckpt'.format(step))
+        V_path = os.path.join(self.chkpt_path, '{}-V.ckpt'.format(step))
+        torch.save(self.generator.state_dict(), G_path)
+        torch.save(self.discriminator.state_dict(), D_path)
+        torch.save(self.value.state_dict(), V_path)
+        print('Saved model checkpoints into {}...'.format(self.chkpt_path))
+
+    def fetch_latest_chkpt_step(self):
+      chkptsfiles = os.listdir(self.chkpt_path)
+      return max(list(map(lambda x: x.split("-")[0], chkptsfiles)))
 
     def all_scores(self, mols, data, norm=False, reconstruction=False):
         m0 = {k: list(filter(lambda e: e is not None, v)) for k, v in {
@@ -406,10 +419,9 @@ class Model_Ops:
                 discriminator_loss.backward()
                 self.discriminator_optimizer.step()
 
-            self.exper_config.time_curr_exper_name_replica.writerow(
-                {"step": step, "run_type": "train", "time": (time.time() - start_train_step_time)})
+            self.exper_config.time_curr_exper_name_replica.writerow({"step": step, "run_type": "train", "time": (time.time() - start_train_step_time)})
 
-            if step % self.exper_config.log_every == 0 and step is not resume_step and step > resume_step+1+self.exper_config.n_critic:
+            if step % self.exper_config.log_every == 0 and step is not resume_step and step > resume_step+1+self.exper_config.n_critic and step is not 0:
 
                 #               fake_discriminator_accuracy = self.accuracy_scores_(fake_label_var, fake_discriminator_preds)
                 #               real_discriminator_accuracy = self.accuracy_scores_(real_label_var, real_discriminator_preds)
@@ -422,7 +434,7 @@ class Model_Ops:
                      "generator_novel": np.mean(generator_novel),
                      "generator_diverse": np.mean(generator_diverse),
                      "generator_drug_candidate_score": np.mean(generator_drug_candidate_score)},
-                    int(step))
+                    step)
                 #               self.exper_config.summary_writer.add_scalars(
                 #                   "{}/train/accuracies".format(self.exper_config.curr_exper_name_replica),
                 #                   {"fake_discriminator_accuracy": fake_discriminator_accuracy,
@@ -438,47 +450,44 @@ class Model_Ops:
                      "fake_reward": np.mean(fake_reward.to("cpu").detach().numpy()),
                      "generator_diffpool_losses[0]": np.mean(generator_diffpool_losses[0].to("cpu").detach().numpy()),
                      "generator_diffpool_losses[1]": np.mean(generator_diffpool_losses[1].to("cpu").detach().numpy())},
-                    int(step))
+                    step)
                 self.exper_config.summary_writer.add_scalars(
                     "{}/train/real_discriminator_losses".format(self.exper_config.curr_exper_name_replica),
                     {"real_discriminator_loss": real_discriminator_loss.to("cpu").detach().numpy(),
                      "fake_discriminator_loss": fake_discriminator_loss.to("cpu").detach().numpy(),
                      "discriminator_loss_w_gp": discriminator_loss_w_gp.to("cpu").detach().numpy(),
-                     "real_discriminator_diffpool_losses[0]": real_discriminator_diffpool_losses[0].to(
-                         "cpu").detach().numpy(),
-                     "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to(
-                         "cpu").detach().numpy(),
-                     "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to(
-                         "cpu").detach().numpy(),
-                     "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to(
-                         "cpu").detach().numpy()},
+                     "real_discriminator_diffpool_losses[0]": real_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
+                     "real_discriminator_diffpool_losses[1]": real_discriminator_diffpool_losses[1].to("cpu").detach().numpy(),
+                     "fake_discriminator_diffpool_losses[0]": fake_discriminator_diffpool_losses[0].to("cpu").detach().numpy(),
+                     "fake_discriminator_diffpool_losses[1]": fake_discriminator_diffpool_losses[1].to("cpu").detach().numpy()},
                     step)
-                for name, param in self.discriminator.named_parameters():
-                    if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
-                for name, param in self.generator.named_parameters():
-                    if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
-                for name, param in self.value.named_parameters():
-                    if param.requires_grad == True:
-                        self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica,name),param,step)
-
+                try:
+                    for name, param in self.discriminator.named_parameters():
+                        if param.requires_grad == True:
+                            self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica, name),
+                                                                           param.clone().cpu().data.numpy(),
+                                                                           step)
+                    for name, param in self.generator.named_parameters():
+                        if param.requires_grad == True:
+                            self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica, name),
+                                                                           param.clone().cpu().data.numpy(),
+                                                                           step)
+                    for name, param in self.value.named_parameters():
+                        if param.requires_grad == True:
+                            self.exper_config.summary_writer.add_histogram("{}/train/{}".format(self.exper_config.curr_exper_name_replica, name),
+                                                                           param.clone().cpu().data.numpy(),
+                                                                           step)
+                except UnboundLocalError as err:
+                    print(err.__traceback__, step)
+                    pass
             # Save model checkpoints.
-            if step % self.exper_config.val_chkpt_every == 0 and step is not resume_step:
-                G_path = os.path.join(self.val_chkpt_path, '{}-G.ckpt'.format(step))
-                D_path = os.path.join(self.val_chkpt_path, '{}-D.ckpt'.format(step))
-                V_path = os.path.join(self.val_chkpt_path, '{}-V.ckpt'.format(step))
+            if step % self.exper_config.val_chkpt_every == 0 and step is not resume_step and step is not 0:
 
-                torch.save(self.generator.state_dict(), G_path)
-                torch.save(self.discriminator.state_dict(), D_path)
-                torch.save(self.value.state_dict(), V_path)
-                print('Saved model checkpoints into {}...'.format(self.val_chkpt_path))
-
-                self.validate(step)
+                self.chkpt_model(step)
+                self.validate(self.fetch_latest_chkpt_step())
 
             self.generator_lr_scheduler.step()
             self.discriminator_lr_scheduler.step()
 
-        self.exper_config.time_curr_exper_name_replica.writerow(
-            {"step": step, "run_type": "full_train", "time": (time.time() - start_full_training_time)})
-        self.test(step)
+        self.exper_config.time_curr_exper_name_replica.writerow({"step": step, "run_type": "full_train", "time": (time.time() - start_full_training_time)})
+        self.test(self.fetch_latest_chkpt_step())

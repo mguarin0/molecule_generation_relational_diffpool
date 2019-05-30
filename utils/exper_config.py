@@ -19,6 +19,8 @@ class Exper_Config:
                  n_critic, z_dim, log_every,
                  val_chkpt_every, dataset,
                  use_cuda, model_config_file):
+        self.resume = resume
+        self.resume_step = resume_step
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.learning_rate = learning_rate

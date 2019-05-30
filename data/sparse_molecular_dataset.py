@@ -7,7 +7,7 @@ import yaml
 from rdkit import Chem
 from datetime import datetime
 
-from utils.utils import *
+from utils  import *
 
 class SparseMolecularDataset():
 

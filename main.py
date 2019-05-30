@@ -70,10 +70,5 @@ if __name__ == "__main__":
 
         # set up model operations for new replica
         model_ops = Model_Ops(exper_config)
-        if args.resume:
-          model_ops.train(True, args.resume_step)
-        else:
-
-          model_ops.train(True, args.resume_step)
-
+        model_ops.train(args.resume, args.resume_step)
         exper_config.increment_replica_num()
